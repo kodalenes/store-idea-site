@@ -9,6 +9,8 @@ import {
   Flag,
   ArrowRight,
   CheckCircle2,
+  HardDrive,
+  ExternalLink,
 } from "lucide-react";
 import { SetupBanner } from "@/components/ui/setup-banner";
 import { useStudioStore } from "@/components/studio/studio-store";
@@ -36,6 +38,7 @@ export function DashboardView() {
     tasks,
     ideas,
     milestones,
+    driveEvents,
     navigateTab,
   } = useStudioStore();
 
@@ -367,6 +370,56 @@ export function DashboardView() {
                     </Link>
                   );
                 })
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-[#1f2735] bg-[#10141d] p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <HardDrive className="h-4.5 w-4.5 text-cyan-400" />
+                <h2 className="text-base font-semibold text-zinc-100">
+                  Son Yüklenen Drive Assetleri
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigateTab("/settings")}
+                className="text-xs font-medium text-cyan-300 hover:text-cyan-200"
+              >
+                Bağlantı Ayarları →
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2.5">
+              {driveEvents.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-[#242e40] bg-[#0a0e15] p-4 text-xs text-zinc-400">
+                  Henüz Drive asset bildirimi yok. Ayarlardan Google Drive
+                  klasörünüzü bağlayarak yeni assetlerden haberdar olabilirsiniz.
+                </div>
+              ) : (
+                driveEvents.slice(0, 5).map((ev) => (
+                  <a
+                    key={ev.id}
+                    href={ev.web_view_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between gap-3 rounded-xl border border-[#1b2332] bg-[#0a0e15] px-3.5 py-2.5 transition hover:border-cyan-500/40"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-medium text-zinc-100">
+                        {ev.file_name}
+                      </p>
+                      <p className="truncate text-[11px] text-zinc-400">
+                        {ev.folder_name} • {ev.uploaded_by_name}
+                      </p>
+                    </div>
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300">
+                      {ev.event_type === "updated" ? "Güncel" : "Yeni"}
+                      <ExternalLink className="h-2.5 w-2.5" />
+                    </span>
+                  </a>
+                ))
               )}
             </div>
           </section>

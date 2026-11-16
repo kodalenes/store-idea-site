@@ -14,8 +14,14 @@ import {
   Menu,
   X,
   Gamepad2,
+  Bell,
+  HardDrive,
+  ExternalLink,
+  Trash2,
+  Check,
 } from "lucide-react";
 import { signOutAction } from "@/app/actions/auth";
+import { clearDriveNotificationsAction } from "@/app/actions/settings";
 import { useStudioStore } from "@/components/studio/studio-store";
 import { SetupBanner } from "@/components/ui/setup-banner";
 import { DashboardView } from "@/components/dashboard/dashboard-view";
@@ -39,6 +45,12 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/milestones", label: "Roadmap & Sistemler", icon: Flag },
 ];
 
+function formatDriveFileSize(bytes: number): string {
+  if (!bytes || bytes <= 0) return "";
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const {
@@ -48,13 +60,42 @@ export function AppShell({ children }: { children: ReactNode }) {
     currentProfile,
     teamProfiles,
     workspace,
+    driveEvents,
+    setDriveEvents,
+    unreadDriveCount,
+    markDriveNotificationsRead,
     activeTab,
     isOnTabRoute,
     navigateTab,
   } = useStudioStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const effectivePath = isOnTabRoute ? activeTab : pathname;
+
+  function handleBellToggle() {
+    setNotificationsOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        markDriveNotificationsRead();
+      }
+      return next;
+    });
+  }
+
+  async function handleClearDriveNotifications() {
+    if (driveEvents.length === 0) return;
+    const prevSnapshot = driveEvents;
+    setDriveEvents([]);
+    try {
+      const res = await clearDriveNotificationsAction();
+      if (!res.ok) {
+        setDriveEvents(prevSnapshot);
+      }
+    } catch {
+      setDriveEvents(prevSnapshot);
+    }
+  }
 
   function handleTabLinkClick(
     e: React.MouseEvent<HTMLAnchorElement>,
@@ -116,14 +157,34 @@ export function AppShell({ children }: { children: ReactNode }) {
               </div>
             </div>
           </Link>
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(false)}
-            className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 lg:hidden"
-            aria-label="Menüyü kapat"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handleBellToggle}
+              title="Drive Asset Bildirimleri"
+              aria-label="Drive Asset Bildirimleri"
+              className={`relative rounded-lg p-1.5 transition ${
+                notificationsOpen
+                  ? "bg-cyan-500/15 text-cyan-300"
+                  : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+              }`}
+            >
+              <Bell className="h-4.5 w-4.5" />
+              {unreadDriveCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-cyan-500 px-1 text-[9px] font-bold text-zinc-950">
+                  {unreadDriveCount > 9 ? "9+" : unreadDriveCount}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(false)}
+              className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 lg:hidden"
+              aria-label="Menüyü kapat"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         {/* Streamlined Navigation */}
@@ -250,10 +311,151 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="text-sm font-semibold text-zinc-100">
             {workspace.project_name}
           </span>
-          <span className="rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-xs text-amber-300">
-            {workspace.ue_version}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-xs text-amber-300">
+              {workspace.ue_version}
+            </span>
+            <button
+              type="button"
+              onClick={handleBellToggle}
+              title="Drive Asset Bildirimleri"
+              aria-label="Drive Asset Bildirimleri"
+              className={`relative rounded-lg border border-[#222b3a] p-1.5 transition ${
+                notificationsOpen
+                  ? "bg-cyan-500/15 text-cyan-300"
+                  : "text-zinc-300 hover:bg-zinc-800"
+              }`}
+            >
+              <Bell className="h-4.5 w-4.5" />
+              {unreadDriveCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-cyan-500 px-1 text-[9px] font-bold text-zinc-950">
+                  {unreadDriveCount > 9 ? "9+" : unreadDriveCount}
+                </span>
+              )}
+            </button>
+          </div>
         </header>
+
+        {/* Drive Notifications Dropdown Popover */}
+        {notificationsOpen && (
+          <>
+            <div
+              className="fixed inset-0 z-40 bg-black/40 lg:bg-transparent"
+              onClick={() => setNotificationsOpen(false)}
+            />
+            <div className="fixed inset-x-3 top-16 z-50 overflow-hidden rounded-xl border border-[#242e40] bg-[#0e131c] shadow-2xl lg:inset-x-auto lg:top-16 lg:left-68 lg:w-96">
+              <div className="flex items-center justify-between border-b border-[#1f2735] px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <HardDrive className="h-4 w-4 text-cyan-400" />
+                  <h3 className="text-xs font-semibold text-zinc-100">
+                    Google Drive Asset Bildirimleri
+                  </h3>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {driveEvents.length > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={markDriveNotificationsRead}
+                        title="Tümünü Okundu İşaretle"
+                        className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+                      >
+                        <Check className="h-3 w-3" />
+                        Okundu
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleClearDriveNotifications();
+                        }}
+                        title="Geçmişi Temizle"
+                        className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-rose-300/80 hover:bg-rose-500/15 hover:text-rose-200"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Temizle
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setNotificationsOpen(false)}
+                    className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+                    aria-label="Kapat"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="max-h-80 divide-y divide-[#182030] overflow-y-auto overscroll-contain">
+                {driveEvents.length === 0 ? (
+                  <div className="p-5 text-center text-xs text-zinc-400">
+                    <p>Henüz Google Drive asset bildirimi yok.</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNotificationsOpen(false);
+                        navigateTab("/settings");
+                      }}
+                      className="mt-2.5 inline-flex items-center gap-1 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-medium text-cyan-300 hover:bg-cyan-500/20"
+                    >
+                      Drive Bağlantısını Ayarla →
+                    </button>
+                  </div>
+                ) : (
+                  driveEvents.map((ev) => {
+                    const sizeLabel = formatDriveFileSize(ev.file_size);
+                    return (
+                      <div
+                        key={ev.id}
+                        className="flex items-start justify-between gap-3 px-4 py-3 transition hover:bg-[#131926]"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span
+                              className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                                ev.event_type === "updated"
+                                  ? "bg-amber-500/15 text-amber-300"
+                                  : "bg-cyan-500/15 text-cyan-300"
+                              }`}
+                            >
+                              {ev.event_type === "updated"
+                                ? "Güncellendi"
+                                : "Yeni"}
+                            </span>
+                            <span className="truncate rounded bg-[#182030] px-1.5 py-0.5 text-[10px] text-zinc-300">
+                              {ev.folder_name}
+                            </span>
+                            {sizeLabel && (
+                              <span className="text-[10px] text-zinc-500">
+                                {sizeLabel}
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1 truncate text-xs font-semibold text-zinc-100">
+                            {ev.file_name}
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-zinc-400">
+                            {ev.uploaded_by_name}
+                          </p>
+                        </div>
+                        <a
+                          href={ev.web_view_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 inline-flex shrink-0 items-center gap-1 rounded-md border border-[#242e40] bg-[#0a0e15] px-2 py-1 text-[11px] font-medium text-cyan-300 hover:border-cyan-500/40"
+                        >
+                          Aç
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </>
+        )}
 
         <main className="flex-1 p-4 sm:p-6">
           <div className="mx-auto max-w-7xl space-y-5">

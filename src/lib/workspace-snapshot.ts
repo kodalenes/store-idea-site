@@ -2,6 +2,7 @@ import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { getRequestAuth } from "@/lib/studio-data";
 import type {
+  DriveAssetEvent,
   Idea,
   IdeaListItem,
   IdeaReferenceLink,
@@ -23,6 +24,7 @@ export interface StudioSnapshot {
   tasks: TaskBoardItem[];
   ideas: IdeaListItem[];
   milestones: Milestone[];
+  driveEvents: DriveAssetEvent[];
 }
 
 const DEFAULT_WORKSPACE: WorkspaceSettings = {
@@ -71,6 +73,7 @@ export async function getInitialStudioSnapshot(): Promise<StudioSnapshot> {
       tasks: [],
       ideas: [],
       milestones: [],
+      driveEvents: [],
     };
   }
 
@@ -84,6 +87,7 @@ export async function getInitialStudioSnapshot(): Promise<StudioSnapshot> {
     milestonesRes,
     ideasRes,
     votesRes,
+    driveEventsRes,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -127,6 +131,13 @@ export async function getInitialStudioSnapshot(): Promise<StudioSnapshot> {
       )
       .order("updated_at", { ascending: false }),
     supabase.from("idea_votes").select("idea_id, user_id"),
+    supabase
+      .from("drive_events")
+      .select(
+        "id, drive_file_id, file_name, mime_type, file_size, folder_name, web_view_link, uploaded_by_name, event_type, created_at"
+      )
+      .order("created_at", { ascending: false })
+      .limit(25),
   ]);
 
   const teamProfiles = (profilesRes.data ?? []) as Profile[];
@@ -257,5 +268,6 @@ export async function getInitialStudioSnapshot(): Promise<StudioSnapshot> {
     tasks,
     ideas,
     milestones,
+    driveEvents: (driveEventsRes.data ?? []) as DriveAssetEvent[],
   };
 }

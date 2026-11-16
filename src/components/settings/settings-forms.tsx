@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import {
   UserCog,
   Sliders,
@@ -8,17 +8,30 @@ import {
   AlertCircle,
   Send,
   Trash2,
+  HardDrive,
+  Copy,
+  Check,
 } from "lucide-react";
 import {
   resetWorkspaceDataAction,
   sendDiscordTestAction,
+  sendDriveTestNotificationAction,
   updateMyProfileAction,
   updateWorkspaceSettingsAction,
   type SettingsActionState,
 } from "@/app/actions/settings";
 import { AVATAR_COLORS, TEAM_ROLES_PRESETS } from "@/lib/constants";
 import { useStudioStore } from "@/components/studio/studio-store";
-import type { Profile, WorkspaceSettings } from "@/types/studio";
+import type { DriveAssetEvent, Profile, WorkspaceSettings } from "@/types/studio";
+
+const emptySubscribe = () => () => {};
+
+function extractDriveFolderId(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) return "BURAYA_GOOGLE_DRIVE_KLASOR_ID_YAZIN";
+  const match = trimmed.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : trimmed;
+}
 
 export function SettingsForms() {
   const {
@@ -34,7 +47,14 @@ export function SettingsForms() {
     setIdeas,
     milestones,
     setMilestones,
+    setDriveEvents,
   } = useStudioStore();
+
+  const siteOrigin = useSyncExternalStore(
+    emptySubscribe,
+    () => window.location.origin,
+    () => "https://SIZIN_SITE_ADRESINIZ"
+  );
 
   const [prevProfileColor, setPrevProfileColor] = useState(
     currentProfile?.avatar_color
@@ -64,6 +84,145 @@ export function SettingsForms() {
     message: string;
   } | null>(null);
   const [resettingDb, setResettingDb] = useState(false);
+
+  const [driveFolderInput, setDriveFolderInput] = useState("");
+  const [driveSecretInput, setDriveSecretInput] = useState(
+    "ue5-studio-drive-secret"
+  );
+  const [copiedScript, setCopiedScript] = useState(false);
+  const [driveTestStatus, setDriveTestStatus] = useState<{
+    ok: boolean;
+    message: string;
+  } | null>(null);
+  const [testingDrive, setTestingDrive] = useState(false);
+
+  const resolvedDriveFolderId = extractDriveFolderId(driveFolderInput);
+  const resolvedDriveSecret =
+    driveSecretInput.trim() || "ue5-studio-drive-secret";
+  const appsScriptCode = `const DRIVE_FOLDER_ID = "${resolvedDriveFolderId}";
+const WEBHOOK_URL = "${siteOrigin}/api/webhooks/google-drive";
+const WEBHOOK_SECRET = "${resolvedDriveSecret}";
+
+function checkDriveFolderForNewAssets() {
+  const props = PropertiesService.getScriptProperties();
+  const nowMs = Date.now();
+  const lastRaw = props.getProperty("LAST_CHECK_TIME");
+  const sinceMs = lastRaw ? Number(lastRaw) : nowMs - 5 * 60 * 1000;
+
+  const rootFolder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+  const changedFiles = [];
+  collectChangedFiles_(rootFolder, rootFolder.getName(), sinceMs, changedFiles);
+
+  if (changedFiles.length === 0) {
+    props.setProperty("LAST_CHECK_TIME", String(nowMs));
+    return;
+  }
+
+  for (let i = 0; i < changedFiles.length; i += 15) {
+    const batch = changedFiles.slice(i, i + 15);
+    const res = UrlFetchApp.fetch(WEBHOOK_URL, {
+      method: "post",
+      contentType: "application/json",
+      headers: { "x-drive-webhook-secret": WEBHOOK_SECRET },
+      payload: JSON.stringify({ files: batch }),
+      muteHttpExceptions: true,
+    });
+    if (res.getResponseCode() >= 300) {
+      throw new Error("Webhook hatasi: HTTP " + res.getResponseCode() + " - " + res.getContentText());
+    }
+  }
+
+  props.setProperty("LAST_CHECK_TIME", String(nowMs));
+}
+
+function collectChangedFiles_(folder, folderPath, sinceMs, out) {
+  const files = folder.getFiles();
+  while (files.hasNext()) {
+    const file = files.next();
+    const createdMs = file.getDateCreated().getTime();
+    const updatedMs = file.getLastUpdated().getTime();
+    if (createdMs > sinceMs || updatedMs > sinceMs) {
+      let ownerName = "Google Drive";
+      try {
+        const owner = file.getOwner();
+        if (owner) ownerName = owner.getName() || owner.getEmail() || "Google Drive";
+      } catch (e) {}
+
+      out.push({
+        id: file.getId(),
+        name: file.getName(),
+        mimeType: file.getMimeType(),
+        size: file.getSize(),
+        folderName: folderPath,
+        url: file.getUrl(),
+        uploadedBy: ownerName,
+        eventType: createdMs > sinceMs ? "created" : "updated",
+      });
+    }
+  }
+
+  const subFolders = folder.getFolders();
+  while (subFolders.hasNext()) {
+    const sub = subFolders.next();
+    collectChangedFiles_(sub, folderPath + " / " + sub.getName(), sinceMs, out);
+  }
+}`;
+
+  async function handleCopyAppsScript() {
+    try {
+      await navigator.clipboard.writeText(appsScriptCode);
+      setCopiedScript(true);
+      setTimeout(() => setCopiedScript(false), 2000);
+    } catch {
+      // Kopyalama desteklenmiyorsa sessiz gec
+    }
+  }
+
+  async function handleSendDriveTest() {
+    setDriveTestStatus(null);
+    setTestingDrive(true);
+
+    const tempId = `temp-drive-${Date.now()}`;
+    const optimisticEvent: DriveAssetEvent = {
+      id: tempId,
+      drive_file_id: tempId,
+      file_name: "SM_HeroSword_HighPoly.fbx",
+      mime_type: "application/octet-stream",
+      file_size: 14820352,
+      folder_name: "Meshes / Weapons",
+      web_view_link: "https://drive.google.com",
+      uploaded_by_name: currentProfile?.display_name ?? "Ekip Üyesi",
+      event_type: "created",
+      created_at: new Date().toISOString(),
+    };
+
+    // 0 ms Optimistic UI (bildirim cani + canli toast + dashboard kartini hemen goster)
+    setDriveEvents((prev) => [optimisticEvent, ...prev.slice(0, 24)]);
+
+    try {
+      const res = await sendDriveTestNotificationAction();
+      if (!res.ok) {
+        setDriveEvents((prev) => prev.filter((ev) => ev.id !== tempId));
+        setDriveTestStatus({ ok: false, message: res.message });
+        return;
+      }
+      if (res.event) {
+        const realEvent = res.event;
+        setDriveEvents((prev) =>
+          prev.map((ev) => (ev.id === tempId ? realEvent : ev))
+        );
+      }
+      setDriveTestStatus({ ok: true, message: res.message });
+    } catch {
+      setDriveEvents((prev) => prev.filter((ev) => ev.id !== tempId));
+      setDriveTestStatus({
+        ok: false,
+        message: "Bağlantı hatası: Test Drive bildirimi gönderilemedi.",
+      });
+    } finally {
+      setTestingDrive(false);
+    }
+  }
 
   async function handleResetWorkspaceData() {
     if (
@@ -501,6 +660,153 @@ export function SettingsForms() {
               sonra ekip arkadaşların hesap oluşturduğunda burada listelenir.
             </div>
           )}
+        </div>
+      </section>
+
+      {/* Google Drive Asset Notification Integration */}
+      <section className="rounded-xl border border-cyan-500/25 bg-[#10141d] p-6 lg:col-span-2">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-500/15 text-cyan-400">
+              <HardDrive className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-zinc-100">
+                Google Drive Asset Bildirim Entegrasyonu
+              </h2>
+              <p className="text-xs text-zinc-400">
+                Drive asset klasörünüze yeni dosya yüklendiğinde hem site içi
+                bildirim çanına/ekranına hem Discord&apos;a otomatik bildirim
+                düşürün.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            disabled={testingDrive || !isConfigured || !currentProfile}
+            onClick={() => {
+              void handleSendDriveTest();
+            }}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-3.5 py-2 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Send className="h-3.5 w-3.5" />
+            {testingDrive ? "Gönderiliyor..." : "Drive Test Bildirimi Gönder"}
+          </button>
+        </div>
+
+        {driveTestStatus && (
+          <div
+            className={`mt-4 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
+              driveTestStatus.ok
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                : "border-rose-500/30 bg-rose-500/10 text-rose-200"
+            }`}
+          >
+            {driveTestStatus.ok ? (
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+            ) : (
+              <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+            )}
+            <span>{driveTestStatus.message}</span>
+          </div>
+        )}
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <label
+              htmlFor="driveFolderId"
+              className="block text-xs font-medium text-zinc-300"
+            >
+              Google Drive Klasör Linki veya ID&apos;si
+            </label>
+            <input
+              id="driveFolderId"
+              type="text"
+              value={driveFolderInput}
+              onChange={(e) => setDriveFolderInput(e.target.value)}
+              placeholder="https://drive.google.com/drive/folders/1AbC..."
+              className="w-full rounded-lg border border-[#242e40] bg-[#080a0f] px-3 py-2 font-mono text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-cyan-500/60 focus:outline-none"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label
+              htmlFor="driveSecret"
+              className="block text-xs font-medium text-zinc-300"
+            >
+              Webhook Gizli Anahtarı (DRIVE_WEBHOOK_SECRET)
+            </label>
+            <input
+              id="driveSecret"
+              type="text"
+              value={driveSecretInput}
+              onChange={(e) => setDriveSecretInput(e.target.value)}
+              placeholder="ue5-studio-drive-secret"
+              className="w-full rounded-lg border border-[#242e40] bg-[#080a0f] px-3 py-2 font-mono text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-cyan-500/60 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-medium text-zinc-300">
+              Hazır Google Apps Script Kodu (Alt klasörler dahil tarar)
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                void handleCopyAppsScript();
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#242e40] bg-[#0a0e15] px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:border-cyan-500/40 hover:text-cyan-300"
+            >
+              {copiedScript ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-emerald-400" />
+                  Kopyalandı
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" />
+                  Kodu Kopyala
+                </>
+              )}
+            </button>
+          </div>
+
+          <pre className="max-h-56 overflow-auto rounded-lg border border-[#1d2534] bg-[#080a0f] p-3 font-mono text-[11px] leading-relaxed text-zinc-300">
+            <code>{appsScriptCode}</code>
+          </pre>
+
+          <ol className="list-inside list-decimal space-y-1 text-[11px] text-zinc-400">
+            <li>
+              Önce{" "}
+              <code className="rounded bg-black/40 px-1 py-0.5 font-mono text-amber-300">
+                supabase/migrations/002_drive_notifications.sql
+              </code>{" "}
+              dosyasını Supabase SQL Editor&apos;de bir kez çalıştırın.
+            </li>
+            <li>
+              <code className="rounded bg-black/40 px-1 py-0.5 font-mono text-cyan-300">
+                script.google.com
+              </code>{" "}
+              adresinde yeni proje açıp yukarıdaki kodu yapıştırın (gerçek Drive
+              bildirimi için sitenin yayındaki URL&apos;i gerekir;{" "}
+              <code className="rounded bg-black/40 px-1 py-0.5 font-mono text-zinc-300">
+                localhost
+              </code>{" "}
+              yerine Vercel adresinizi kullanın).
+            </li>
+            <li>
+              Soldan <strong>Tetikleyiciler (Triggers) → Tetikleyici Ekle</strong>{" "}
+              menüsünden{" "}
+              <code className="rounded bg-black/40 px-1 py-0.5 font-mono text-cyan-300">
+                checkDriveFolderForNewAssets
+              </code>{" "}
+              fonksiyonunu <strong>Dakika zamanlayıcı → Her 1 dakikada bir</strong>{" "}
+              olarak kaydedip Drive okuma iznini onaylayın.
+            </li>
+          </ol>
         </div>
       </section>
 

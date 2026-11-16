@@ -172,3 +172,16 @@ export interface MilestoneWithStats extends Milestone {
   >[];
 }
 
+export interface DriveAssetEvent {
+  id: string;
+  drive_file_id: string;
+  file_name: string;
+  mime_type: string;
+  file_size: number;
+  folder_name: string;
+  web_view_link: string;
+  uploaded_by_name: string;
+  event_type: "created" | "updated";
+  created_at: string;
+}
+

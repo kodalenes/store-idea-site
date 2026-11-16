@@ -12,9 +12,11 @@ import {
   type SetStateAction,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { ExternalLink, HardDrive, X } from "lucide-react";
 import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import type { StudioSnapshot } from "@/lib/workspace-snapshot";
 import type {
+  DriveAssetEvent,
   IdeaListItem,
   Milestone,
   Profile,
@@ -66,6 +68,12 @@ interface StudioStoreValue {
   setIdeas: Dispatch<SetStateAction<IdeaListItem[]>>;
   milestones: Milestone[];
   setMilestones: Dispatch<SetStateAction<Milestone[]>>;
+  driveEvents: DriveAssetEvent[];
+  setDriveEvents: Dispatch<SetStateAction<DriveAssetEvent[]>>;
+  unreadDriveCount: number;
+  markDriveNotificationsRead: () => void;
+  liveDriveToast: DriveAssetEvent | null;
+  dismissDriveToast: () => void;
   activeTab: StudioTabPath;
   isOnTabRoute: boolean;
   tasksMilestoneFilter: string;
@@ -99,6 +107,15 @@ export function StudioStoreProvider({
   const [workspace, setWorkspace] = useState<WorkspaceSettings>(
     initialSnapshot.workspace
   );
+  const [driveEvents, setDriveEvents] = useState<DriveAssetEvent[]>(
+    initialSnapshot.driveEvents
+  );
+  const [lastSeenDriveAt, setLastSeenDriveAt] = useState<string>("");
+  const [liveDriveToast, setLiveDriveToast] =
+    useState<DriveAssetEvent | null>(null);
+  const [prevTopDriveId, setPrevTopDriveId] = useState<string | undefined>(
+    initialSnapshot.driveEvents[0]?.id
+  );
 
   // Sunucu snapshot'i Realtime veya router.refresh() ile yenilendiginde store'u guncelle
   if (prevSnapshot !== initialSnapshot) {
@@ -108,6 +125,15 @@ export function StudioStoreProvider({
     setMilestones(initialSnapshot.milestones);
     setTeamProfiles(initialSnapshot.teamProfiles);
     setWorkspace(initialSnapshot.workspace);
+    setDriveEvents(initialSnapshot.driveEvents);
+  }
+
+  const latestDriveEvent = driveEvents[0];
+  if (latestDriveEvent && latestDriveEvent.id !== prevTopDriveId) {
+    setPrevTopDriveId(latestDriveEvent.id);
+    setLiveDriveToast(latestDriveEvent);
+  } else if (!latestDriveEvent && prevTopDriveId !== undefined) {
+    setPrevTopDriveId(undefined);
   }
 
   const isOnTabRoute = isStudioTabPath(pathname);
@@ -157,6 +183,12 @@ export function StudioStoreProvider({
         if (isTaskBoardViewMode(savedView)) {
           setTasksViewModeState(savedView);
         }
+        const savedSeen = window.localStorage.getItem(
+          "studio-last-seen-drive-at"
+        );
+        if (savedSeen) {
+          setLastSeenDriveAt(savedSeen);
+        }
       } catch {
         // localStorage erisim hatasinda sessiz kal
       }
@@ -167,13 +199,22 @@ export function StudioStoreProvider({
     return () => window.removeEventListener("popstate", syncFromLocation);
   }, []);
 
-  // Tek merkezi Realtime dinleyicisi (ekip arkadaslarinin yaptigi degisiklikleri ceker)
+  useEffect(() => {
+    if (!liveDriveToast) return;
+    const timer = setTimeout(() => {
+      setLiveDriveToast(null);
+    }, 6500);
+    return () => clearTimeout(timer);
+  }, [liveDriveToast]);
+
+  // Tek merkezi Realtime dinleyicisi (ekip arkadaslarinin yaptigi degisiklikleri ve Drive olaylarini ceker)
   useRealtimeRefresh("studio-global-live", [
     { table: "tasks" },
     { table: "subtasks" },
     { table: "ideas" },
     { table: "idea_votes" },
     { table: "milestones" },
+    { table: "drive_events" },
   ]);
 
   const navigateTab = useCallback(
@@ -215,6 +256,28 @@ export function StudioStoreProvider({
     );
   }, [initialSnapshot.userId, initialSnapshot.currentProfile, teamProfiles]);
 
+  const unreadDriveCount = useMemo(() => {
+    if (driveEvents.length === 0) return 0;
+    if (!lastSeenDriveAt) return driveEvents.length;
+    const seenTs = Date.parse(lastSeenDriveAt);
+    if (Number.isNaN(seenTs)) return driveEvents.length;
+    return driveEvents.filter((ev) => Date.parse(ev.created_at) > seenTs).length;
+  }, [driveEvents, lastSeenDriveAt]);
+
+  const markDriveNotificationsRead = useCallback(() => {
+    const latest = driveEvents[0]?.created_at ?? new Date().toISOString();
+    setLastSeenDriveAt(latest);
+    try {
+      window.localStorage.setItem("studio-last-seen-drive-at", latest);
+    } catch {
+      // localStorage erisim hatasinda sessiz kal
+    }
+  }, [driveEvents]);
+
+  const dismissDriveToast = useCallback(() => {
+    setLiveDriveToast(null);
+  }, []);
+
   const value = useMemo<StudioStoreValue>(
     () => ({
       isConfigured: initialSnapshot.isConfigured,
@@ -231,6 +294,12 @@ export function StudioStoreProvider({
       setIdeas,
       milestones,
       setMilestones,
+      driveEvents,
+      setDriveEvents,
+      unreadDriveCount,
+      markDriveNotificationsRead,
+      liveDriveToast,
+      dismissDriveToast,
       activeTab: isOnTabRoute ? clientTab : "/",
       isOnTabRoute,
       tasksMilestoneFilter,
@@ -249,6 +318,11 @@ export function StudioStoreProvider({
       tasks,
       ideas,
       milestones,
+      driveEvents,
+      unreadDriveCount,
+      markDriveNotificationsRead,
+      liveDriveToast,
+      dismissDriveToast,
       isOnTabRoute,
       clientTab,
       tasksMilestoneFilter,
@@ -260,6 +334,47 @@ export function StudioStoreProvider({
 
   return (
     <StudioStoreContext.Provider value={value}>
+      {liveDriveToast && (
+        <div className="fixed top-4 right-4 z-[70] w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-cyan-500/40 bg-[#0d131e]/95 p-3.5 shadow-2xl backdrop-blur-md">
+          <div className="flex items-start gap-2.5">
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan-500/15 text-cyan-300">
+              <HardDrive className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-cyan-300">
+                  {liveDriveToast.event_type === "updated"
+                    ? "Drive Asset Güncellendi"
+                    : "Yeni Drive Asset"}
+                </span>
+                <button
+                  type="button"
+                  onClick={dismissDriveToast}
+                  className="rounded p-0.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+                  aria-label="Bildirimi kapat"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <p className="mt-0.5 truncate text-xs font-semibold text-zinc-100">
+                {liveDriveToast.file_name}
+              </p>
+              <p className="mt-0.5 truncate text-[11px] text-zinc-400">
+                {liveDriveToast.folder_name} • {liveDriveToast.uploaded_by_name}
+              </p>
+              <a
+                href={liveDriveToast.web_view_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-amber-300 hover:text-amber-200"
+              >
+                Google Drive&apos;da Aç
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
       {children}
     </StudioStoreContext.Provider>
   );

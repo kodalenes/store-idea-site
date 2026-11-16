@@ -2,8 +2,12 @@
 
 import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
-import { sendDiscordNotification } from "@/lib/discord";
+import {
+  queueDiscordNotification,
+  sendDiscordNotification,
+} from "@/lib/discord";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { DriveAssetEvent } from "@/types/studio";
 
 export type SettingsActionState = {
   error?: string;
@@ -243,8 +247,9 @@ export async function resetWorkspaceDataAction(): Promise<{
     }
   }
 
-  // Eski kurulumlardan kalan asset_locks tablosunu da temizle (yoksa sessiz gec)
+  // Eski kurulumlardan kalan asset_locks ve drive_events tablolarini da temizle (yoksa sessiz gec)
   await supabase.from("asset_locks").delete().not("id", "is", null);
+  await supabase.from("drive_events").delete().not("id", "is", null);
 
   updateTag("studio:snapshot");
   updateTag("studio:context");
@@ -255,5 +260,104 @@ export async function resetWorkspaceDataAction(): Promise<{
   updateTag("studio:milestones");
   revalidatePath("/", "layout");
 
+  return { ok: true };
+}
+
+export async function sendDriveTestNotificationAction(): Promise<{
+  ok: boolean;
+  message: string;
+  event?: DriveAssetEvent;
+}> {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return { ok: false, message: "Supabase yapılandırılmamış." };
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
+  if (!user) {
+    return { ok: false, message: "Bu işlem için giriş yapmalısınız." };
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("display_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const uploaderName =
+    profile?.display_name ?? user.email?.split("@")[0] ?? "Ekip Üyesi";
+
+  const { data: inserted, error } = await supabase
+    .from("drive_events")
+    .insert({
+      drive_file_id: `test-${Date.now()}`,
+      file_name: "SM_HeroSword_HighPoly.fbx",
+      mime_type: "application/octet-stream",
+      file_size: 14820352,
+      folder_name: "Meshes / Weapons",
+      web_view_link: "https://drive.google.com",
+      uploaded_by_name: uploaderName,
+      event_type: "created",
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    return {
+      ok: false,
+      message:
+        "Drive tablosu henüz oluşturulmamış görünüyor. Lütfen supabase/migrations/002_drive_notifications.sql dosyasını Supabase SQL Editor'de çalıştırın.",
+    };
+  }
+
+  updateTag("studio:snapshot");
+  queueDiscordNotification({
+    title: "📦 Test Drive Asset: SM_HeroSword_HighPoly.fbx",
+    description: "Google Drive bildirim bağlantısı test edildi.",
+    color: 0x06b6d4,
+    fields: [
+      { name: "Klasör", value: "Meshes / Weapons", inline: true },
+      { name: "Yükleyen", value: uploaderName, inline: true },
+      { name: "Boyut", value: "14.1 MB", inline: true },
+    ],
+  });
+
+  return {
+    ok: true,
+    message: "Test Drive asset bildirimi kaydedildi ve yayına alındı!",
+    event: inserted as DriveAssetEvent,
+  };
+}
+
+export async function clearDriveNotificationsAction(): Promise<{
+  ok: boolean;
+  error?: string;
+}> {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return { ok: false, error: "Supabase yapılandırılmamış." };
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user) {
+    return { ok: false, error: "Oturum bulunamadı." };
+  }
+
+  const { error } = await supabase
+    .from("drive_events")
+    .delete()
+    .not("id", "is", null);
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  updateTag("studio:snapshot");
+  revalidatePath("/", "layout");
   return { ok: true };
 }
