@@ -183,3 +183,77 @@ export async function sendDiscordTestAction(): Promise<{
     message: "Test mesajı Discord kanalına gönderildi!",
   };
 }
+
+export async function resetWorkspaceDataAction(): Promise<{
+  ok: boolean;
+  error?: string;
+}> {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return { ok: false, error: "Supabase yapılandırılmamış." };
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user) {
+    return { ok: false, error: "Bu işlem için giriş yapmalısınız." };
+  }
+
+  const { data: attRows } = await supabase
+    .from("attachments")
+    .select("file_path");
+
+  if (attRows && attRows.length > 0) {
+    const paths = attRows.map((a) => a.file_path).filter(Boolean);
+    if (paths.length > 0) {
+      await supabase.storage.from("studio-media").remove(paths);
+    }
+  }
+
+  const tablesWithId = [
+    "attachments",
+    "comments",
+    "subtasks",
+    "tasks",
+    "ideas",
+    "milestones",
+  ] as const;
+
+  // idea_votes bilesik anahtara sahip (idea_id, user_id)
+  const { error: votesError } = await supabase
+    .from("idea_votes")
+    .delete()
+    .not("idea_id", "is", null);
+
+  if (votesError) {
+    return {
+      ok: false,
+      error: `Fikir oyları silinemedi: ${votesError.message}`,
+    };
+  }
+
+  for (const table of tablesWithId) {
+    const { error } = await supabase.from(table).delete().not("id", "is", null);
+    if (error) {
+      return {
+        ok: false,
+        error: `${table} verileri temizlenemedi: ${error.message}`,
+      };
+    }
+  }
+
+  // Eski kurulumlardan kalan asset_locks tablosunu da temizle (yoksa sessiz gec)
+  await supabase.from("asset_locks").delete().not("id", "is", null);
+
+  updateTag("studio:snapshot");
+  updateTag("studio:context");
+  updateTag("studio:dashboard");
+  updateTag("studio:tasks");
+  updateTag("studio:bugs");
+  updateTag("studio:ideas");
+  updateTag("studio:milestones");
+  revalidatePath("/", "layout");
+
+  return { ok: true };
+}
