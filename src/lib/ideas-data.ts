@@ -1,6 +1,5 @@
 import "server-only";
-import { getSupabaseConfig } from "@/lib/supabase/config";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getRequestAuth, getRequestProfiles } from "@/lib/studio-data";
 import type {
   Attachment,
   Idea,
@@ -17,8 +16,6 @@ export interface IdeasPageData {
   isConfigured: boolean;
   currentUserId: string | null;
   ideas: IdeaListItem[];
-  teamProfiles: Profile[];
-  milestones: Milestone[];
 }
 
 function normalizeLinks(raw: unknown): IdeaReferenceLink[] {
@@ -33,64 +30,43 @@ function normalizeLinks(raw: unknown): IdeaReferenceLink[] {
 }
 
 export async function getIdeasPageData(): Promise<IdeasPageData> {
-  const { isConfigured } = getSupabaseConfig();
-  if (!isConfigured) {
+  const { isConfigured, supabase, user } = await getRequestAuth();
+  if (!isConfigured || !supabase || !user) {
     return {
-      isConfigured: false,
+      isConfigured,
       currentUserId: null,
       ideas: [],
-      teamProfiles: [],
-      milestones: [],
     };
   }
 
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) {
-    return {
-      isConfigured: false,
-      currentUserId: null,
-      ideas: [],
-      teamProfiles: [],
-      milestones: [],
-    };
-  }
+  const [
+    ideasRes,
+    votesRes,
+    commentsRes,
+    attachmentsRes,
+    tasksRes,
+    teamProfiles,
+  ] = await Promise.all([
+    supabase
+      .from("ideas")
+      .select(
+        "id, title, summary, category, status, reference_links, created_by, created_at, updated_at"
+      )
+      .order("updated_at", { ascending: false }),
+    supabase.from("idea_votes").select("idea_id, user_id"),
+    supabase.from("comments").select("target_id").eq("target_type", "idea"),
+    supabase
+      .from("attachments")
+      .select("target_id, public_url, mime_type")
+      .eq("target_type", "idea")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("tasks")
+      .select("source_idea_id")
+      .not("source_idea_id", "is", null),
+    getRequestProfiles(),
+  ]);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return {
-      isConfigured: true,
-      currentUserId: null,
-      ideas: [],
-      teamProfiles: [],
-      milestones: [],
-    };
-  }
-
-  const [ideasRes, votesRes, commentsRes, attachmentsRes, tasksRes, profilesRes, milestonesRes] =
-    await Promise.all([
-      supabase.from("ideas").select("*").order("updated_at", { ascending: false }),
-      supabase.from("idea_votes").select("idea_id, user_id"),
-      supabase
-        .from("comments")
-        .select("id, target_id")
-        .eq("target_type", "idea"),
-      supabase
-        .from("attachments")
-        .select("id, target_id, public_url, mime_type")
-        .eq("target_type", "idea")
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("tasks")
-        .select("id, source_idea_id")
-        .not("source_idea_id", "is", null),
-      supabase.from("profiles").select("*").order("created_at", { ascending: true }),
-      supabase.from("milestones").select("*").order("sort_order", { ascending: true }),
-    ]);
-
-  const teamProfiles = (profilesRes.data ?? []) as Profile[];
   const profileMap = new Map(teamProfiles.map((p) => [p.id, p]));
 
   const votesByIdea = new Map<string, Set<string>>();
@@ -134,10 +110,13 @@ export async function getIdeasPageData(): Promise<IdeasPageData> {
     }
   }
 
-  const ideas: IdeaListItem[] = ((ideasRes.data ?? []) as Idea[]).map((idea) => {
+  const ideas: IdeaListItem[] = (
+    (ideasRes.data ?? []) as Omit<Idea, "content_md">[]
+  ).map((idea) => {
     const voters = votesByIdea.get(idea.id) ?? new Set<string>();
     return {
       ...idea,
+      content_md: "",
       reference_links: normalizeLinks(idea.reference_links),
       author: idea.created_by ? profileMap.get(idea.created_by) ?? null : null,
       vote_count: voters.size,
@@ -153,8 +132,6 @@ export async function getIdeasPageData(): Promise<IdeasPageData> {
     isConfigured: true,
     currentUserId: user.id,
     ideas,
-    teamProfiles,
-    milestones: (milestonesRes.data ?? []) as Milestone[],
   };
 }
 
@@ -165,10 +142,10 @@ export async function getIdeaDetailData(ideaId: string): Promise<{
   teamProfiles: Profile[];
   milestones: Milestone[];
 }> {
-  const { isConfigured } = getSupabaseConfig();
-  if (!isConfigured) {
+  const { isConfigured, supabase, user } = await getRequestAuth();
+  if (!isConfigured || !supabase || !user) {
     return {
-      isConfigured: false,
+      isConfigured,
       currentUserId: null,
       idea: null,
       teamProfiles: [],
@@ -176,57 +153,49 @@ export async function getIdeaDetailData(ideaId: string): Promise<{
     };
   }
 
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) {
-    return {
-      isConfigured: false,
-      currentUserId: null,
-      idea: null,
-      teamProfiles: [],
-      milestones: [],
-    };
-  }
+  const [
+    ideaRes,
+    votesRes,
+    commentsRes,
+    attachmentsRes,
+    tasksRes,
+    teamProfiles,
+    milestonesRes,
+  ] = await Promise.all([
+    supabase
+      .from("ideas")
+      .select(
+        "id, title, summary, content_md, category, status, reference_links, created_by, created_at, updated_at"
+      )
+      .eq("id", ideaId)
+      .maybeSingle(),
+    supabase.from("idea_votes").select("user_id").eq("idea_id", ideaId),
+    supabase
+      .from("comments")
+      .select("id, target_type, target_id, author_id, body, created_at")
+      .eq("target_type", "idea")
+      .eq("target_id", ideaId)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("attachments")
+      .select(
+        "id, target_type, target_id, file_name, file_path, public_url, mime_type, file_size, uploaded_by, created_at"
+      )
+      .eq("target_type", "idea")
+      .eq("target_id", ideaId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("tasks")
+      .select("id, title, status, priority, assignee_id, ue_tags")
+      .eq("source_idea_id", ideaId)
+      .order("created_at", { ascending: false }),
+    getRequestProfiles(),
+    supabase
+      .from("milestones")
+      .select("id, title, description, target_date, status, sort_order, created_by, created_at")
+      .order("sort_order", { ascending: true }),
+  ]);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return {
-      isConfigured: true,
-      currentUserId: null,
-      idea: null,
-      teamProfiles: [],
-      milestones: [],
-    };
-  }
-
-  const [ideaRes, votesRes, commentsRes, attachmentsRes, tasksRes, profilesRes, milestonesRes] =
-    await Promise.all([
-      supabase.from("ideas").select("*").eq("id", ideaId).maybeSingle(),
-      supabase.from("idea_votes").select("user_id").eq("idea_id", ideaId),
-      supabase
-        .from("comments")
-        .select("*")
-        .eq("target_type", "idea")
-        .eq("target_id", ideaId)
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("attachments")
-        .select("*")
-        .eq("target_type", "idea")
-        .eq("target_id", ideaId)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("tasks")
-        .select("id, title, status, priority, assignee_id, ue_tags")
-        .eq("source_idea_id", ideaId)
-        .order("created_at", { ascending: false }),
-      supabase.from("profiles").select("*").order("created_at", { ascending: true }),
-      supabase.from("milestones").select("*").order("sort_order", { ascending: true }),
-    ]);
-
-  const teamProfiles = (profilesRes.data ?? []) as Profile[];
   const profileMap = new Map(teamProfiles.map((p) => [p.id, p]));
 
   if (!ideaRes.data) {
@@ -245,14 +214,14 @@ export async function getIdeaDetailData(ideaId: string): Promise<{
     .map((id) => profileMap.get(id))
     .filter((p): p is Profile => Boolean(p));
 
-  const comments: StudioComment[] = ((commentsRes.data ?? []) as StudioComment[]).map(
-    (comment) => ({
-      ...comment,
-      author: comment.author_id
-        ? profileMap.get(comment.author_id) ?? null
-        : null,
-    })
-  );
+  const comments: StudioComment[] = (
+    (commentsRes.data ?? []) as StudioComment[]
+  ).map((comment) => ({
+    ...comment,
+    author: comment.author_id
+      ? profileMap.get(comment.author_id) ?? null
+      : null,
+  }));
 
   const detail: IdeaDetail = {
     ...rawIdea,

@@ -1,10 +1,16 @@
 import { Suspense } from "react";
 import { SetupBanner } from "@/components/ui/setup-banner";
 import { SettingsForms } from "@/components/settings/settings-forms";
-import { getStudioContext } from "@/lib/studio-data";
+import {
+  getStudioContext,
+  getWorkspaceSettingsFull,
+} from "@/lib/studio-data";
 
 async function SettingsContent() {
-  const context = await getStudioContext();
+  const [context, fullWorkspace] = await Promise.all([
+    getStudioContext(),
+    getWorkspaceSettingsFull(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -23,7 +29,7 @@ async function SettingsContent() {
       <SettingsForms
         isConfigured={context.isConfigured}
         currentProfile={context.currentProfile}
-        workspace={context.workspace}
+        workspace={fullWorkspace}
         teamProfiles={context.teamProfiles}
       />
     </div>

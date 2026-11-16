@@ -2,12 +2,12 @@
 
 import {
   startTransition,
-  useEffect,
   useMemo,
   useOptimistic,
   useRef,
   useState,
 } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -30,18 +30,30 @@ import {
   UE_DISCIPLINE_TAGS,
 } from "@/lib/constants";
 import { uploadStudioMedia } from "@/lib/media-upload";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import { createBugAction } from "@/app/actions/bugs";
 import {
   moveTaskStatusAction,
   registerTaskAttachmentAction,
   updateTaskAction,
 } from "@/app/actions/tasks";
-import { TaskDetailDrawer } from "@/components/tasks/task-detail-drawer";
-import {
-  TaskFormModal,
-  type TaskFormValues,
-} from "@/components/tasks/task-form-modal";
+import type { TaskFormValues } from "@/components/tasks/task-form-modal";
+
+const TaskDetailDrawer = dynamic(
+  () =>
+    import("@/components/tasks/task-detail-drawer").then(
+      (mod) => mod.TaskDetailDrawer
+    ),
+  { ssr: false }
+);
+
+const TaskFormModal = dynamic(
+  () =>
+    import("@/components/tasks/task-form-modal").then(
+      (mod) => mod.TaskFormModal
+    ),
+  { ssr: false }
+);
 import type {
   BugSeverity,
   Milestone,
@@ -115,23 +127,7 @@ export function BugsBoard({
   const [submitting, setSubmitting] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const supabase = createSupabaseBrowserClient();
-    if (!supabase) return;
-
-    const channel = supabase
-      .channel("bugs-live")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "tasks" },
-        () => router.refresh()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [router]);
+  useRealtimeRefresh("bugs-live", [{ table: "tasks" }]);
 
   const stats = useMemo(() => {
     const open = optimisticBugs.filter((b) => b.status !== "done");

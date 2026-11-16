@@ -1,44 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 
 export function DashboardLiveRefresh() {
-  const router = useRouter();
-
-  useEffect(() => {
-    const supabase = createSupabaseBrowserClient();
-    if (!supabase) return;
-
-    const channel = supabase
-      .channel("dashboard-live")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "tasks" },
-        () => router.refresh()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "ideas" },
-        () => router.refresh()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "asset_locks" },
-        () => router.refresh()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "milestones" },
-        () => router.refresh()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [router]);
+  useRealtimeRefresh("dashboard-live", [
+    { table: "tasks" },
+    { table: "ideas" },
+    { table: "asset_locks" },
+    { table: "milestones" },
+  ]);
 
   return null;
 }

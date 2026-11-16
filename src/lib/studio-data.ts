@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Profile, WorkspaceSettings } from "@/types/studio";
@@ -21,29 +22,26 @@ const DEFAULT_WORKSPACE: WorkspaceSettings = {
   updated_at: new Date().toISOString(),
 };
 
-export async function getStudioContext(): Promise<StudioSessionContext> {
+/**
+ * Tek bir HTTP istegi icinde Supabase istemcisini ve auth.getUser() sonucunu
+ * React cache() ile tekillestirir (Layout + Sayfa arasinda cift sorgu atilmaz).
+ */
+export const getRequestAuth = cache(async () => {
   const { isConfigured } = getSupabaseConfig();
-
   if (!isConfigured) {
     return {
-      isConfigured: false,
-      userId: null,
-      userEmail: null,
-      currentProfile: null,
-      teamProfiles: [],
-      workspace: DEFAULT_WORKSPACE,
+      isConfigured: false as const,
+      supabase: null,
+      user: null,
     };
   }
 
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
     return {
-      isConfigured: false,
-      userId: null,
-      userEmail: null,
-      currentProfile: null,
-      teamProfiles: [],
-      workspace: DEFAULT_WORKSPACE,
+      isConfigured: false as const,
+      supabase: null,
+      user: null,
     };
   }
 
@@ -51,39 +49,95 @@ export async function getStudioContext(): Promise<StudioSessionContext> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
+  return {
+    isConfigured: true as const,
+    supabase,
+    user,
+  };
+});
+
+/**
+ * Ekip profillerini istek basina tek bir sorguda getirir ve paylasir.
+ */
+export const getRequestProfiles = cache(async (): Promise<Profile[]> => {
+  const { supabase, user } = await getRequestAuth();
+  if (!supabase || !user) return [];
+
+  const { data } = await supabase
+    .from("profiles")
+    .select(
+      "id, email, display_name, role_title, avatar_color, avatar_url, created_at, updated_at"
+    )
+    .order("created_at", { ascending: true });
+
+  return (data ?? []) as Profile[];
+});
+
+export const getStudioContext = cache(
+  async (): Promise<StudioSessionContext> => {
+    const { isConfigured, supabase, user } = await getRequestAuth();
+
+    if (!isConfigured || !supabase) {
+      return {
+        isConfigured,
+        userId: null,
+        userEmail: null,
+        currentProfile: null,
+        teamProfiles: [],
+        workspace: DEFAULT_WORKSPACE,
+      };
+    }
+
+    if (!user) {
+      return {
+        isConfigured: true,
+        userId: null,
+        userEmail: null,
+        currentProfile: null,
+        teamProfiles: [],
+        workspace: DEFAULT_WORKSPACE,
+      };
+    }
+
+    const [teamProfiles, { data: workspaceData }] = await Promise.all([
+      getRequestProfiles(),
+      supabase
+        .from("workspace_settings")
+        .select("id, studio_name, project_name, ue_version, updated_at")
+        .eq("id", 1)
+        .maybeSingle(),
+    ]);
+
+    const currentProfile =
+      teamProfiles.find((profile) => profile.id === user.id) ?? null;
+
+    const workspace: WorkspaceSettings = workspaceData
+      ? {
+          ...workspaceData,
+          discord_webhook_url: null,
+        }
+      : DEFAULT_WORKSPACE;
+
     return {
       isConfigured: true,
-      userId: null,
-      userEmail: null,
-      currentProfile: null,
-      teamProfiles: [],
-      workspace: DEFAULT_WORKSPACE,
+      userId: user.id,
+      userEmail: user.email ?? null,
+      currentProfile,
+      teamProfiles,
+      workspace,
     };
   }
+);
 
-  const [{ data: profilesData }, { data: workspaceData }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("workspace_settings")
-      .select("*")
-      .eq("id", 1)
-      .maybeSingle(),
-  ]);
+export async function getWorkspaceSettingsFull(): Promise<WorkspaceSettings> {
+  const { supabase, user } = await getRequestAuth();
+  if (!supabase || !user) return DEFAULT_WORKSPACE;
 
-  const teamProfiles = (profilesData ?? []) as Profile[];
-  const currentProfile =
-    teamProfiles.find((profile) => profile.id === user.id) ?? null;
+  const { data } = await supabase
+    .from("workspace_settings")
+    .select("*")
+    .eq("id", 1)
+    .maybeSingle();
 
-  return {
-    isConfigured: true,
-    userId: user.id,
-    userEmail: user.email ?? null,
-    currentProfile,
-    teamProfiles,
-    workspace: (workspaceData as WorkspaceSettings | null) ?? DEFAULT_WORKSPACE,
-  };
+  return (data as WorkspaceSettings | null) ?? DEFAULT_WORKSPACE;
 }

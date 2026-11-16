@@ -1,6 +1,7 @@
 "use client";
 
 import { startTransition, useEffect, useOptimistic, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -36,7 +37,31 @@ import {
   registerTaskAttachmentAction,
   toggleSubtaskAction,
 } from "@/app/actions/tasks";
-import { MarkdownViewer } from "@/components/ideas/markdown-viewer";
+const MarkdownViewer = dynamic(
+  () =>
+    import("@/components/ideas/markdown-viewer").then(
+      (mod) => mod.MarkdownViewer
+    ),
+  { ssr: false }
+);
+
+interface CachedTaskExtras {
+  comments: StudioComment[];
+  attachments: Attachment[];
+}
+
+const MAX_TASK_CACHE_ENTRIES = 25;
+const taskExtrasCache = new Map<string, CachedTaskExtras>();
+
+function writeTaskExtrasCache(taskId: string, value: CachedTaskExtras) {
+  if (taskExtrasCache.has(taskId)) {
+    taskExtrasCache.delete(taskId);
+  } else if (taskExtrasCache.size >= MAX_TASK_CACHE_ENTRIES) {
+    const oldestKey = taskExtrasCache.keys().next().value;
+    if (oldestKey) taskExtrasCache.delete(oldestKey);
+  }
+  taskExtrasCache.set(taskId, value);
+}
 import type {
   Attachment,
   Profile,
@@ -87,14 +112,38 @@ export function TaskDetailDrawer({
     }
   );
 
-  const [comments, setComments] = useState<StudioComment[]>([]);
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [loadingExtras, setLoadingExtras] = useState(false);
+  const [extrasState, setExtrasState] = useState<{
+    taskId: string;
+    comments: StudioComment[];
+    attachments: Attachment[];
+  } | null>(null);
   const [commentBody, setCommentBody] = useState("");
   const [uploading, setUploading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const taskId = task?.id ?? null;
+  const cachedExtras = taskId ? taskExtrasCache.get(taskId) : undefined;
+  const activeExtras =
+    extrasState && extrasState.taskId === taskId ? extrasState : cachedExtras;
+  const comments = activeExtras?.comments ?? [];
+  const attachments = activeExtras?.attachments ?? [];
+  const loadingExtras = Boolean(taskId) && !activeExtras;
+
+  function updateTaskExtras(
+    targetTaskId: string,
+    updater: (prev: CachedTaskExtras) => CachedTaskExtras
+  ) {
+    const current =
+      extrasState && extrasState.taskId === targetTaskId
+        ? { comments: extrasState.comments, attachments: extrasState.attachments }
+        : taskExtrasCache.get(targetTaskId) ?? {
+            comments: [],
+            attachments: [],
+          };
+    const next = updater(current);
+    writeTaskExtrasCache(targetTaskId, next);
+    setExtrasState({ taskId: targetTaskId, ...next });
+  }
   const hasUnsavedDraft =
     newSubtask.trim().length > 0 ||
     commentBody.trim().length > 0 ||
@@ -117,21 +166,24 @@ export function TaskDetailDrawer({
     if (!taskId) return;
     let cancelled = false;
 
-    async function loadExtras() {
-      setLoadingExtras(true);
+    async function loadExtras(id: string) {
       try {
-        const res = await fetch(`/api/tasks/${taskId}`);
+        const res = await fetch(`/api/tasks/${id}`);
         if (res.ok && !cancelled) {
           const json = await res.json();
-          setComments(json.comments ?? []);
-          setAttachments(json.attachments ?? []);
+          const next: CachedTaskExtras = {
+            comments: json.comments ?? [],
+            attachments: json.attachments ?? [],
+          };
+          writeTaskExtrasCache(id, next);
+          setExtrasState({ taskId: id, ...next });
         }
-      } finally {
-        if (!cancelled) setLoadingExtras(false);
+      } catch {
+        // Ag hatasinda cache varsa gosterilmeye devam eder
       }
     }
 
-    loadExtras();
+    loadExtras(taskId);
     return () => {
       cancelled = true;
     };
@@ -238,7 +290,10 @@ export function TaskDetailDrawer({
       const res = await fetch(`/api/tasks/${task.id}`);
       if (res.ok) {
         const json = await res.json();
-        setAttachments(json.attachments ?? []);
+        updateTaskExtras(task.id, (prev) => ({
+          ...prev,
+          attachments: json.attachments ?? [],
+        }));
       }
       router.refresh();
     } finally {
@@ -265,30 +320,40 @@ export function TaskDetailDrawer({
     };
 
     setCommentBody("");
-    setComments((prev) => [...prev, optimisticComment]);
+    updateTaskExtras(task.id, (prev) => ({
+      ...prev,
+      comments: [...prev.comments, optimisticComment],
+    }));
 
     try {
       const res = await addTaskCommentAction(task.id, cleanBody);
       if (res.ok && res.data) {
-        setComments((prev) =>
-          prev.map((c) =>
+        updateTaskExtras(task.id, (prev) => ({
+          ...prev,
+          comments: prev.comments.map((c) =>
             c.id === tempId
               ? { ...c, id: res.data!.id, created_at: res.data!.created_at }
               : c
-          )
-        );
+          ),
+        }));
         startTransition(() => {
           router.refresh();
         });
       } else {
-        setComments((prev) => prev.filter((c) => c.id !== tempId));
+        updateTaskExtras(task.id, (prev) => ({
+          ...prev,
+          comments: prev.comments.filter((c) => c.id !== tempId),
+        }));
         setCommentBody(cleanBody);
         setActionError(
           res.error ?? "Yorum veritabanına kaydedilemedi, geri alındı."
         );
       }
     } catch {
-      setComments((prev) => prev.filter((c) => c.id !== tempId));
+      updateTaskExtras(task.id, (prev) => ({
+        ...prev,
+        comments: prev.comments.filter((c) => c.id !== tempId),
+      }));
       setCommentBody(cleanBody);
       setActionError("Bağlantı hatası: Yorum kaydedilemedi, geri alındı.");
     }
@@ -641,9 +706,12 @@ export function TaskDetailDrawer({
                       <button
                         type="button"
                         onClick={async () => {
-                          setAttachments((prev) =>
-                            prev.filter((a) => a.id !== att.id)
-                          );
+                          updateTaskExtras(task.id, (prev) => ({
+                            ...prev,
+                            attachments: prev.attachments.filter(
+                              (a) => a.id !== att.id
+                            ),
+                          }));
                           await deleteTaskAttachmentAction(att.id, att.file_path);
                           router.refresh();
                         }}
@@ -683,13 +751,19 @@ export function TaskDetailDrawer({
                         onClick={async () => {
                           setActionError(null);
                           const snapshot = comments;
-                          setComments((prev) =>
-                            prev.filter((c) => c.id !== comment.id)
-                          );
+                          updateTaskExtras(task.id, (prev) => ({
+                            ...prev,
+                            comments: prev.comments.filter(
+                              (c) => c.id !== comment.id
+                            ),
+                          }));
                           try {
                             const res = await deleteTaskCommentAction(comment.id);
                             if (!res.ok) {
-                              setComments(snapshot);
+                              updateTaskExtras(task.id, (prev) => ({
+                                ...prev,
+                                comments: snapshot,
+                              }));
                               setActionError(
                                 res.error ?? "Yorum silinemedi, geri alındı."
                               );
@@ -699,7 +773,10 @@ export function TaskDetailDrawer({
                               router.refresh();
                             });
                           } catch {
-                            setComments(snapshot);
+                            updateTaskExtras(task.id, (prev) => ({
+                              ...prev,
+                              comments: snapshot,
+                            }));
                             setActionError(
                               "Bağlantı hatası: Yorum silme işlemi geri alındı."
                             );

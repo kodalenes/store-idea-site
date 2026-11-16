@@ -2,7 +2,6 @@
 
 import {
   startTransition,
-  useEffect,
   useMemo,
   useOptimistic,
   useState,
@@ -19,7 +18,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { ASSET_LOCK_TYPES } from "@/lib/constants";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import { lockAssetAction, unlockAssetAction } from "@/app/actions/locks";
 import type {
   AssetLockType,
@@ -100,23 +99,7 @@ export function AssetLocksBoard({
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const supabase = createSupabaseBrowserClient();
-    if (!supabase) return;
-
-    const channel = supabase
-      .channel("asset-locks-live")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "asset_locks" },
-        () => router.refresh()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [router]);
+  useRealtimeRefresh("asset-locks-live", [{ table: "asset_locks" }]);
 
   const filteredLocks = useMemo(() => {
     const q = search.trim().toLowerCase();

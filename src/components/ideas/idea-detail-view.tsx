@@ -1,6 +1,7 @@
 "use client";
 
-import { startTransition, useEffect, useOptimistic, useRef, useState } from "react";
+import { startTransition, useOptimistic, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -29,7 +30,7 @@ import {
   UE_DISCIPLINE_TAGS,
 } from "@/lib/constants";
 import { uploadStudioMedia } from "@/lib/media-upload";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import {
   addIdeaCommentAction,
   convertIdeaToTaskAction,
@@ -41,11 +42,16 @@ import {
   updateIdeaAction,
   updateIdeaStatusAction,
 } from "@/app/actions/ideas";
-import {
-  IdeaFormModal,
-  type IdeaFormValues,
-} from "@/components/ideas/idea-form-modal";
+import type { IdeaFormValues } from "@/components/ideas/idea-form-modal";
 import { MarkdownViewer } from "@/components/ideas/markdown-viewer";
+
+const IdeaFormModal = dynamic(
+  () =>
+    import("@/components/ideas/idea-form-modal").then(
+      (mod) => mod.IdeaFormModal
+    ),
+  { ssr: false }
+);
 import type {
   Attachment,
   IdeaDetail,
@@ -123,39 +129,10 @@ export function IdeaDetailView({
   const [convertSuccess, setConvertSuccess] = useState<string | null>(null);
   const [convertError, setConvertError] = useState<string | null>(null);
 
-  // Canli guncelleme
-  useEffect(() => {
-    const supabase = createSupabaseBrowserClient();
-    if (!supabase) return;
-
-    const channel = supabase
-      .channel(`idea-detail-${idea.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "comments",
-          filter: `target_id=eq.${idea.id}`,
-        },
-        () => router.refresh()
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "attachments",
-          filter: `target_id=eq.${idea.id}`,
-        },
-        () => router.refresh()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [idea.id, router]);
+  useRealtimeRefresh(`idea-detail-${idea.id}`, [
+    { table: "comments", filter: `target_id=eq.${idea.id}` },
+    { table: "attachments", filter: `target_id=eq.${idea.id}` },
+  ]);
 
   const catMeta =
     IDEA_CATEGORIES.find((c) => c.value === idea.category) ??

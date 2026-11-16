@@ -1,6 +1,7 @@
 "use client";
 
-import { startTransition, useEffect, useMemo, useOptimistic, useState } from "react";
+import { startTransition, useMemo, useOptimistic, useState } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,15 +16,20 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { IDEA_CATEGORIES, IDEA_STATUSES } from "@/lib/constants";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import {
   createIdeaAction,
   toggleIdeaVoteAction,
 } from "@/app/actions/ideas";
-import {
-  IdeaFormModal,
-  type IdeaFormValues,
-} from "@/components/ideas/idea-form-modal";
+import type { IdeaFormValues } from "@/components/ideas/idea-form-modal";
+
+const IdeaFormModal = dynamic(
+  () =>
+    import("@/components/ideas/idea-form-modal").then(
+      (mod) => mod.IdeaFormModal
+    ),
+  { ssr: false }
+);
 import type {
   IdeaCategory,
   IdeaListItem,
@@ -59,29 +65,10 @@ export function IdeasBoard({
   const [sortBy, setSortBy] = useState<"recent" | "votes">("recent");
   const [createOpen, setCreateOpen] = useState(false);
 
-  // Canli Realtime senkronizasyonu
-  useEffect(() => {
-    const supabase = createSupabaseBrowserClient();
-    if (!supabase) return;
-
-    const channel = supabase
-      .channel("ideas-board-live")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "ideas" },
-        () => router.refresh()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "idea_votes" },
-        () => router.refresh()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [router]);
+  useRealtimeRefresh("ideas-board-live", [
+    { table: "ideas" },
+    { table: "idea_votes" },
+  ]);
 
   const filteredIdeas = useMemo(() => {
     const q = search.trim().toLowerCase();

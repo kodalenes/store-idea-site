@@ -1,6 +1,5 @@
 import "server-only";
-import { getSupabaseConfig } from "@/lib/supabase/config";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getRequestAuth } from "@/lib/studio-data";
 import type {
   AssetLockWithProfile,
   Idea,
@@ -57,92 +56,125 @@ export async function getDashboardData(
   userId: string | null,
   teamProfiles: Profile[]
 ): Promise<DashboardData> {
-  const { isConfigured } = getSupabaseConfig();
-  if (!isConfigured || !userId) return EMPTY_DASHBOARD;
+  const { isConfigured, supabase } = await getRequestAuth();
+  if (!isConfigured || !supabase || !userId) return EMPTY_DASHBOARD;
 
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) return EMPTY_DASHBOARD;
-
-  const [ideasRes, tasksRes, locksRes, milestonesRes] = await Promise.all([
+  const [
+    ideasCountRes,
+    openTasksCountRes,
+    locksCountRes,
+    openBugsCountRes,
+    myTasksRes,
+    activeMilestonesRes,
+    milestoneTasksRes,
+    activeLocksRes,
+    recentIdeasRes,
+  ] = await Promise.all([
+    supabase.from("ideas").select("id", { count: "exact", head: true }),
+    supabase
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("kind", "task")
+      .neq("status", "done"),
+    supabase.from("asset_locks").select("id", { count: "exact", head: true }),
+    supabase
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("kind", "bug")
+      .neq("status", "done"),
+    supabase
+      .from("tasks")
+      .select("id, title, kind, status, priority, ue_tags")
+      .eq("assignee_id", userId)
+      .neq("status", "done")
+      .order("updated_at", { ascending: false })
+      .limit(20),
+    supabase
+      .from("milestones")
+      .select("id, title, status, target_date")
+      .neq("status", "completed")
+      .order("sort_order", { ascending: true })
+      .limit(4),
+    supabase
+      .from("tasks")
+      .select("milestone_id, status")
+      .not("milestone_id", "is", null),
+    supabase
+      .from("asset_locks")
+      .select("id, asset_path, lock_type, locked_by, note, locked_at")
+      .order("locked_at", { ascending: false })
+      .limit(6),
     supabase
       .from("ideas")
       .select("id, title, category, status, updated_at")
-      .order("updated_at", { ascending: false }),
-    supabase
-      .from("tasks")
-      .select("id, title, kind, status, priority, ue_tags, assignee_id, milestone_id")
-      .order("updated_at", { ascending: false }),
-    supabase
-      .from("asset_locks")
-      .select("*")
-      .order("locked_at", { ascending: false }),
-    supabase
-      .from("milestones")
-      .select("*")
-      .neq("status", "completed")
-      .order("sort_order", { ascending: true }),
+      .order("updated_at", { ascending: false })
+      .limit(5),
   ]);
-
-  const allIdeas = (ideasRes.data ?? []) as Pick<
-    Idea,
-    "id" | "title" | "category" | "status" | "updated_at"
-  >[];
-  const allTasks = (tasksRes.data ?? []) as Pick<
-    Task,
-    | "id"
-    | "title"
-    | "kind"
-    | "status"
-    | "priority"
-    | "ue_tags"
-    | "assignee_id"
-    | "milestone_id"
-  >[];
-  const allLocks = (locksRes.data ?? []) as AssetLockWithProfile[];
-  const milestones = (milestonesRes.data ?? []) as Milestone[];
 
   const profileMap = new Map(teamProfiles.map((p) => [p.id, p]));
 
-  const myTasks = allTasks
-    .filter((t) => t.assignee_id === userId && t.status !== "done")
+  const myTasks = ((myTasksRes.data ?? []) as Pick<
+    Task,
+    "id" | "title" | "kind" | "status" | "priority" | "ue_tags"
+  >[])
     .sort((a, b) => PRIORITY_WEIGHT[a.priority] - PRIORITY_WEIGHT[b.priority])
     .slice(0, 6);
 
-  const activeMilestones: DashboardMilestoneSummary[] = milestones
-    .slice(0, 4)
-    .map((m) => {
-      const linked = allTasks.filter((t) => t.milestone_id === m.id);
-      const total = linked.length;
-      const done = linked.filter((t) => t.status === "done").length;
+  const milestoneRows = (activeMilestonesRes.data ?? []) as Pick<
+    Milestone,
+    "id" | "title" | "status" | "target_date"
+  >[];
+  const milestoneTaskStats = new Map<
+    string,
+    { total: number; done: number }
+  >();
+  for (const row of milestoneTasksRes.data ?? []) {
+    if (!row.milestone_id) continue;
+    const current = milestoneTaskStats.get(row.milestone_id) ?? {
+      total: 0,
+      done: 0,
+    };
+    current.total += 1;
+    if (row.status === "done") current.done += 1;
+    milestoneTaskStats.set(row.milestone_id, current);
+  }
+
+  const activeMilestones: DashboardMilestoneSummary[] = milestoneRows.map(
+    (m) => {
+      const stat = milestoneTaskStats.get(m.id) ?? { total: 0, done: 0 };
       return {
         id: m.id,
         title: m.title,
         status: m.status,
         target_date: m.target_date,
-        total_tasks: total,
-        done_tasks: done,
-        progress_percent: total > 0 ? Math.round((done / total) * 100) : 0,
+        total_tasks: stat.total,
+        done_tasks: stat.done,
+        progress_percent:
+          stat.total > 0 ? Math.round((stat.done / stat.total) * 100) : 0,
       };
-    });
+    }
+  );
 
-  const activeLocks: AssetLockWithProfile[] = allLocks.slice(0, 6).map((l) => ({
+  const activeLocks: AssetLockWithProfile[] = (
+    (activeLocksRes.data ?? []) as AssetLockWithProfile[]
+  ).map((l) => ({
     ...l,
     owner: profileMap.get(l.locked_by) ?? null,
   }));
 
   return {
     counts: {
-      ideas: allIdeas.length,
-      openTasks: allTasks.filter(
-        (t) => t.kind === "task" && t.status !== "done"
-      ).length,
-      locks: allLocks.length,
-      openBugs: allTasks.filter((t) => t.kind === "bug" && t.status !== "done")
-        .length,
+      ideas: ideasCountRes.count ?? 0,
+      openTasks: openTasksCountRes.count ?? 0,
+      locks: locksCountRes.count ?? 0,
+      openBugs: openBugsCountRes.count ?? 0,
     },
     myTasks,
     activeMilestones,
     activeLocks,
-    recentIdeas: allIdeas.slice(0, 5),
+    recentIdeas: (recentIdeasRes.data ?? []) as Pick<
+      Idea,
+      "id" | "title" | "category" | "status" | "updated_at"
+    >[],
   };
 }

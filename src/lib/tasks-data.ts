@@ -1,6 +1,5 @@
 import "server-only";
-import { getSupabaseConfig } from "@/lib/supabase/config";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getRequestAuth, getRequestProfiles } from "@/lib/studio-data";
 import type {
   Idea,
   Milestone,
@@ -21,37 +20,10 @@ export interface TasksBoardData {
 }
 
 export async function getTasksBoardData(): Promise<TasksBoardData> {
-  const { isConfigured } = getSupabaseConfig();
-  if (!isConfigured) {
+  const { isConfigured, supabase, user } = await getRequestAuth();
+  if (!isConfigured || !supabase || !user) {
     return {
-      isConfigured: false,
-      currentUserId: null,
-      tasks: [],
-      teamProfiles: [],
-      milestones: [],
-      ideas: [],
-    };
-  }
-
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) {
-    return {
-      isConfigured: false,
-      currentUserId: null,
-      tasks: [],
-      teamProfiles: [],
-      milestones: [],
-      ideas: [],
-    };
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return {
-      isConfigured: true,
+      isConfigured,
       currentUserId: null,
       tasks: [],
       teamProfiles: [],
@@ -65,35 +37,36 @@ export async function getTasksBoardData(): Promise<TasksBoardData> {
     subtasksRes,
     commentsRes,
     attachmentsRes,
-    profilesRes,
+    teamProfiles,
     milestonesRes,
     ideasRes,
   ] = await Promise.all([
     supabase
       .from("tasks")
-      .select("*")
+      .select(
+        "id, title, description_md, kind, status, priority, ue_tags, assignee_id, reporter_id, milestone_id, source_idea_id, blocked_by_task_id, bug_severity, repro_steps, build_version, position, created_at, updated_at"
+      )
       .order("position", { ascending: true })
       .order("created_at", { ascending: false }),
     supabase
       .from("subtasks")
-      .select("*")
+      .select("id, task_id, title, is_done, position, created_at")
       .order("position", { ascending: true })
       .order("created_at", { ascending: true }),
     supabase
       .from("comments")
-      .select("id, target_id")
+      .select("target_id")
       .eq("target_type", "task"),
     supabase
       .from("attachments")
-      .select("id, target_id")
+      .select("target_id")
       .eq("target_type", "task"),
-    supabase
-      .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: true }),
+    getRequestProfiles(),
     supabase
       .from("milestones")
-      .select("*")
+      .select(
+        "id, title, description, target_date, status, sort_order, created_by, created_at"
+      )
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true }),
     supabase
@@ -102,7 +75,6 @@ export async function getTasksBoardData(): Promise<TasksBoardData> {
       .order("updated_at", { ascending: false }),
   ]);
 
-  const teamProfiles = (profilesRes.data ?? []) as Profile[];
   const profileMap = new Map(teamProfiles.map((p) => [p.id, p]));
 
   const milestones = (milestonesRes.data ?? []) as Milestone[];
@@ -138,10 +110,7 @@ export async function getTasksBoardData(): Promise<TasksBoardData> {
 
   const rawTasks = (tasksRes.data ?? []) as Task[];
   const taskLiteMap = new Map(
-    rawTasks.map((t) => [
-      t.id,
-      { id: t.id, title: t.title, status: t.status },
-    ])
+    rawTasks.map((t) => [t.id, { id: t.id, title: t.title, status: t.status }])
   );
 
   const tasks: TaskBoardItem[] = rawTasks.map((task) => ({
@@ -178,34 +147,23 @@ export async function getMilestonesPageData(): Promise<{
   milestones: MilestoneWithStats[];
   teamProfiles: Profile[];
 }> {
-  const { isConfigured } = getSupabaseConfig();
-  if (!isConfigured) {
-    return { isConfigured: false, milestones: [], teamProfiles: [] };
+  const { isConfigured, supabase, user } = await getRequestAuth();
+  if (!isConfigured || !supabase || !user) {
+    return { isConfigured, milestones: [], teamProfiles: [] };
   }
 
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) {
-    return { isConfigured: false, milestones: [], teamProfiles: [] };
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { isConfigured: true, milestones: [], teamProfiles: [] };
-  }
-
-  const [milestonesRes, tasksRes, profilesRes] = await Promise.all([
+  const [milestonesRes, tasksRes, teamProfiles] = await Promise.all([
     supabase
       .from("milestones")
-      .select("*")
+      .select(
+        "id, title, description, target_date, status, sort_order, created_by, created_at"
+      )
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true }),
     supabase
       .from("tasks")
       .select("id, title, status, priority, kind, assignee_id, milestone_id"),
-    supabase.from("profiles").select("*").order("created_at", { ascending: true }),
+    getRequestProfiles(),
   ]);
 
   const rawMilestones = (milestonesRes.data ?? []) as Milestone[];
@@ -247,6 +205,6 @@ export async function getMilestonesPageData(): Promise<{
   return {
     isConfigured: true,
     milestones,
-    teamProfiles: (profilesRes.data ?? []) as Profile[],
+    teamProfiles,
   };
 }

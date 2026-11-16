@@ -1,9 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { X, Plus, Trash2, Eye, Edit3, AlertCircle } from "lucide-react";
 import { IDEA_CATEGORIES, IDEA_STATUSES } from "@/lib/constants";
-import { MarkdownViewer } from "@/components/ideas/markdown-viewer";
+
+const MarkdownViewer = dynamic(
+  () =>
+    import("@/components/ideas/markdown-viewer").then(
+      (mod) => mod.MarkdownViewer
+    ),
+  { ssr: false }
+);
 import type {
   IdeaCategory,
   IdeaReferenceLink,

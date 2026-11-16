@@ -1,6 +1,5 @@
 import "server-only";
-import { getSupabaseConfig } from "@/lib/supabase/config";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getRequestAuth, getRequestProfiles } from "@/lib/studio-data";
 import type {
   AssetLock,
   AssetLockWithProfile,
@@ -17,51 +16,24 @@ export async function getAssetLocksData(): Promise<{
   locks: AssetLockWithProfile[];
   teamProfiles: Profile[];
 }> {
-  const { isConfigured } = getSupabaseConfig();
-  if (!isConfigured) {
+  const { isConfigured, supabase, user } = await getRequestAuth();
+  if (!isConfigured || !supabase || !user) {
     return {
-      isConfigured: false,
+      isConfigured,
       currentUserId: null,
       locks: [],
       teamProfiles: [],
     };
   }
 
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) {
-    return {
-      isConfigured: false,
-      currentUserId: null,
-      locks: [],
-      teamProfiles: [],
-    };
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return {
-      isConfigured: true,
-      currentUserId: null,
-      locks: [],
-      teamProfiles: [],
-    };
-  }
-
-  const [locksRes, profilesRes] = await Promise.all([
+  const [locksRes, teamProfiles] = await Promise.all([
     supabase
       .from("asset_locks")
-      .select("*")
+      .select("id, asset_path, lock_type, locked_by, note, locked_at")
       .order("locked_at", { ascending: false }),
-    supabase
-      .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: true }),
+    getRequestProfiles(),
   ]);
 
-  const teamProfiles = (profilesRes.data ?? []) as Profile[];
   const profileMap = new Map(teamProfiles.map((p) => [p.id, p]));
 
   const locks: AssetLockWithProfile[] = ((locksRes.data ?? []) as AssetLock[]).map(
@@ -86,10 +58,10 @@ export async function getBugsPageData(): Promise<{
   teamProfiles: Profile[];
   milestones: Milestone[];
 }> {
-  const { isConfigured } = getSupabaseConfig();
-  if (!isConfigured) {
+  const { isConfigured, supabase, user } = await getRequestAuth();
+  if (!isConfigured || !supabase || !user) {
     return {
-      isConfigured: false,
+      isConfigured,
       currentUserId: null,
       bugs: [],
       teamProfiles: [],
@@ -97,61 +69,42 @@ export async function getBugsPageData(): Promise<{
     };
   }
 
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) {
-    return {
-      isConfigured: false,
-      currentUserId: null,
-      bugs: [],
-      teamProfiles: [],
-      milestones: [],
-    };
-  }
+  const [
+    bugsRes,
+    subtasksRes,
+    commentsRes,
+    attachmentsRes,
+    teamProfiles,
+    milestonesRes,
+  ] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select(
+        "id, title, description_md, kind, status, priority, ue_tags, assignee_id, reporter_id, milestone_id, source_idea_id, blocked_by_task_id, bug_severity, repro_steps, build_version, position, created_at, updated_at"
+      )
+      .eq("kind", "bug")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("subtasks")
+      .select("id, task_id, title, is_done, position, created_at")
+      .order("position", { ascending: true }),
+    supabase
+      .from("comments")
+      .select("target_id")
+      .eq("target_type", "task"),
+    supabase
+      .from("attachments")
+      .select("target_id")
+      .eq("target_type", "task"),
+    getRequestProfiles(),
+    supabase
+      .from("milestones")
+      .select(
+        "id, title, description, target_date, status, sort_order, created_by, created_at"
+      )
+      .order("sort_order", { ascending: true }),
+  ]);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return {
-      isConfigured: true,
-      currentUserId: null,
-      bugs: [],
-      teamProfiles: [],
-      milestones: [],
-    };
-  }
-
-  const [bugsRes, subtasksRes, commentsRes, attachmentsRes, profilesRes, milestonesRes] =
-    await Promise.all([
-      supabase
-        .from("tasks")
-        .select("*")
-        .eq("kind", "bug")
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("subtasks")
-        .select("*")
-        .order("position", { ascending: true }),
-      supabase
-        .from("comments")
-        .select("id, target_id")
-        .eq("target_type", "task"),
-      supabase
-        .from("attachments")
-        .select("id, target_id")
-        .eq("target_type", "task"),
-      supabase
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("milestones")
-        .select("*")
-        .order("sort_order", { ascending: true }),
-    ]);
-
-  const teamProfiles = (profilesRes.data ?? []) as Profile[];
   const profileMap = new Map(teamProfiles.map((p) => [p.id, p]));
   const milestones = (milestonesRes.data ?? []) as Milestone[];
   const milestoneMap = new Map(

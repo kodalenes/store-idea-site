@@ -2,11 +2,11 @@
 
 import {
   startTransition,
-  useEffect,
   useMemo,
   useOptimistic,
   useState,
 } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   Plus,
@@ -24,17 +24,29 @@ import {
   TASK_STATUSES,
   UE_DISCIPLINE_TAGS,
 } from "@/lib/constants";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import {
   createTaskAction,
   moveTaskStatusAction,
   updateTaskAction,
 } from "@/app/actions/tasks";
-import {
-  TaskFormModal,
-  type TaskFormValues,
-} from "@/components/tasks/task-form-modal";
-import { TaskDetailDrawer } from "@/components/tasks/task-detail-drawer";
+import type { TaskFormValues } from "@/components/tasks/task-form-modal";
+
+const TaskFormModal = dynamic(
+  () =>
+    import("@/components/tasks/task-form-modal").then(
+      (mod) => mod.TaskFormModal
+    ),
+  { ssr: false }
+);
+
+const TaskDetailDrawer = dynamic(
+  () =>
+    import("@/components/tasks/task-detail-drawer").then(
+      (mod) => mod.TaskDetailDrawer
+    ),
+  { ssr: false }
+);
 import type {
   Idea,
   Milestone,
@@ -91,29 +103,10 @@ export function KanbanBoard({
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [boardError, setBoardError] = useState<string | null>(null);
 
-  // Live Realtime updates
-  useEffect(() => {
-    const supabase = createSupabaseBrowserClient();
-    if (!supabase) return;
-
-    const channel = supabase
-      .channel("kanban-live")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "tasks" },
-        () => router.refresh()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "subtasks" },
-        () => router.refresh()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [router]);
+  useRealtimeRefresh("kanban-live", [
+    { table: "tasks" },
+    { table: "subtasks" },
+  ]);
 
   const filteredTasks = useMemo(() => {
     const q = search.trim().toLowerCase();
