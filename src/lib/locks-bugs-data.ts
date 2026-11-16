@@ -1,4 +1,5 @@
 import "server-only";
+import { cacheLife, cacheTag } from "next/cache";
 import { getRequestAuth, getRequestProfiles } from "@/lib/studio-data";
 import type {
   AssetLock,
@@ -16,6 +17,10 @@ export async function getAssetLocksData(): Promise<{
   locks: AssetLockWithProfile[];
   teamProfiles: Profile[];
 }> {
+  "use cache: private";
+  cacheTag("studio:locks");
+  cacheLife({ stale: 300, revalidate: 60, expire: 300 });
+
   const { isConfigured, supabase, user } = await getRequestAuth();
   if (!isConfigured || !supabase || !user) {
     return {
@@ -58,6 +63,10 @@ export async function getBugsPageData(): Promise<{
   teamProfiles: Profile[];
   milestones: Milestone[];
 }> {
+  "use cache: private";
+  cacheTag("studio:bugs", "studio:tasks", "studio:milestones");
+  cacheLife({ stale: 300, revalidate: 60, expire: 300 });
+
   const { isConfigured, supabase, user } = await getRequestAuth();
   if (!isConfigured || !supabase || !user) {
     return {

@@ -1,4 +1,5 @@
 import "server-only";
+import { cacheLife, cacheTag } from "next/cache";
 import { getRequestAuth, getRequestProfiles } from "@/lib/studio-data";
 import type {
   Idea,
@@ -20,6 +21,10 @@ export interface TasksBoardData {
 }
 
 export async function getTasksBoardData(): Promise<TasksBoardData> {
+  "use cache: private";
+  cacheTag("studio:tasks", "studio:milestones", "studio:ideas");
+  cacheLife({ stale: 300, revalidate: 60, expire: 300 });
+
   const { isConfigured, supabase, user } = await getRequestAuth();
   if (!isConfigured || !supabase || !user) {
     return {
@@ -147,6 +152,10 @@ export async function getMilestonesPageData(): Promise<{
   milestones: MilestoneWithStats[];
   teamProfiles: Profile[];
 }> {
+  "use cache: private";
+  cacheTag("studio:milestones", "studio:tasks");
+  cacheLife({ stale: 300, revalidate: 60, expire: 300 });
+
   const { isConfigured, supabase, user } = await getRequestAuth();
   if (!isConfigured || !supabase || !user) {
     return { isConfigured, milestones: [], teamProfiles: [] };

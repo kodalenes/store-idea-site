@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import { sendDiscordNotification } from "@/lib/discord";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -116,6 +116,9 @@ export async function lockAssetAction(input: {
     ],
   });
 
+  updateTag("studio:locks");
+  updateTag("studio:dashboard");
+  updateTag("studio:locks");
   revalidatePath("/locks");
   revalidatePath("/");
   return { ok: true, data: { id: data.id, locked_at: data.locked_at } };
@@ -138,6 +141,9 @@ export async function unlockAssetAction(
     return { ok: false, error: error.message };
   }
 
+  updateTag("studio:locks");
+  updateTag("studio:dashboard");
+  updateTag("studio:locks");
   revalidatePath("/locks");
   revalidatePath("/");
   return { ok: true };
@@ -160,6 +166,7 @@ export async function updateLockNoteAction(
 
   if (error) return { ok: false, error: error.message };
 
+  updateTag("studio:locks");
   revalidatePath("/locks");
   return { ok: true };
 }

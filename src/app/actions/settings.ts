@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import { sendDiscordNotification } from "@/lib/discord";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -81,6 +81,7 @@ export async function updateMyProfileAction(
     return { error: `Profil güncellenemedi: ${error.message}` };
   }
 
+  updateTag("studio:context");
   revalidatePath("/", "layout");
   return { success: "Profilin güncellendi." };
 }
@@ -126,6 +127,7 @@ export async function updateWorkspaceSettingsAction(
     return { error: `Proje ayarları kaydedilemedi: ${error.message}` };
   }
 
+  updateTag("studio:context");
   revalidatePath("/", "layout");
   return { success: "Proje ayarları kaydedildi." };
 }

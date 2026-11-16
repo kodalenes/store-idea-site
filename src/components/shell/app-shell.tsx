@@ -46,6 +46,10 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+
+  const effectivePath =
+    pendingHref && pendingHref !== pathname ? pendingHref : pathname;
 
   const activeName =
     context.currentProfile?.display_name ??
@@ -109,14 +113,18 @@ export function AppShell({
           {NAV_ITEMS.map((item) => {
             const isActive =
               item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
+                ? effectivePath === "/"
+                : effectivePath.startsWith(item.href);
             const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={() => setMobileMenuOpen(false)}
+                prefetch={true}
+                onClick={() => {
+                  setPendingHref(item.href);
+                  setMobileMenuOpen(false);
+                }}
                 className={`flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition ${
                   isActive
                     ? "border border-amber-500/30 bg-amber-500/10 text-amber-300"

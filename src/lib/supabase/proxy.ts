@@ -31,21 +31,23 @@ export async function updateSessionAndGuard(request: NextRequest) {
     },
   });
 
+  // Proxy katmaninda hizli optimist kontrol: gecerli JWT'de ag istegi atmaz (<1ms),
+  // suresi dolmussa otomatik yeniler. Mutasyonlar ve veri katmani getUser() ile dogrulanir.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
 
   const pathname = request.nextUrl.pathname;
   const isPublicPath = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
 
-  if (!user && !isPublicPath) {
+  if (!session?.user && !isPublicPath) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (user && pathname === "/login") {
+  if (session?.user && pathname === "/login") {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/";
     redirectUrl.search = "";

@@ -1,4 +1,5 @@
 import "server-only";
+import { cacheLife, cacheTag } from "next/cache";
 import { getRequestAuth, getRequestProfiles } from "@/lib/studio-data";
 import type {
   Attachment,
@@ -30,6 +31,10 @@ function normalizeLinks(raw: unknown): IdeaReferenceLink[] {
 }
 
 export async function getIdeasPageData(): Promise<IdeasPageData> {
+  "use cache: private";
+  cacheTag("studio:ideas");
+  cacheLife({ stale: 300, revalidate: 60, expire: 300 });
+
   const { isConfigured, supabase, user } = await getRequestAuth();
   if (!isConfigured || !supabase || !user) {
     return {
@@ -142,6 +147,10 @@ export async function getIdeaDetailData(ideaId: string): Promise<{
   teamProfiles: Profile[];
   milestones: Milestone[];
 }> {
+  "use cache: private";
+  cacheTag("studio:ideas", `idea:${ideaId}`);
+  cacheLife({ stale: 300, revalidate: 60, expire: 300 });
+
   const { isConfigured, supabase, user } = await getRequestAuth();
   if (!isConfigured || !supabase || !user) {
     return {

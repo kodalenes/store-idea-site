@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { cacheLife, cacheTag } from "next/cache";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Profile, WorkspaceSettings } from "@/types/studio";
@@ -75,6 +76,10 @@ export const getRequestProfiles = cache(async (): Promise<Profile[]> => {
 
 export const getStudioContext = cache(
   async (): Promise<StudioSessionContext> => {
+    "use cache: private";
+    cacheTag("studio:context");
+    cacheLife({ stale: 300, revalidate: 60, expire: 300 });
+
     const { isConfigured, supabase, user } = await getRequestAuth();
 
     if (!isConfigured || !supabase) {

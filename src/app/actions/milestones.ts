@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { MilestoneStatus } from "@/types/studio";
@@ -64,6 +64,9 @@ export async function createMilestoneAction(input: {
 
   if (error) return { ok: false, error: error.message };
 
+  updateTag("studio:milestones");
+  updateTag("studio:tasks");
+  updateTag("studio:dashboard");
   revalidatePath("/milestones");
   revalidatePath("/tasks");
   revalidatePath("/");
@@ -104,6 +107,9 @@ export async function updateMilestoneAction(
 
   if (error) return { ok: false, error: error.message };
 
+  updateTag("studio:milestones");
+  updateTag("studio:tasks");
+  updateTag("studio:dashboard");
   revalidatePath("/milestones");
   revalidatePath("/tasks");
   return { ok: true };
@@ -120,6 +126,9 @@ export async function deleteMilestoneAction(
   const { error } = await supabase.from("milestones").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
 
+  updateTag("studio:milestones");
+  updateTag("studio:tasks");
+  updateTag("studio:dashboard");
   revalidatePath("/milestones");
   revalidatePath("/tasks");
   return { ok: true };

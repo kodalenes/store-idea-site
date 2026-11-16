@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import { sendDiscordNotification } from "@/lib/discord";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -43,7 +43,12 @@ async function requireAuthSupabase() {
 }
 
 function revalidateTaskViews() {
+  updateTag("studio:tasks");
+  updateTag("studio:bugs");
+  updateTag("studio:milestones");
+  updateTag("studio:dashboard");
   revalidatePath("/tasks");
+  revalidatePath("/bugs");
   revalidatePath("/milestones");
   revalidatePath("/");
 }

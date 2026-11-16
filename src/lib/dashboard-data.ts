@@ -1,4 +1,5 @@
 import "server-only";
+import { cacheLife, cacheTag } from "next/cache";
 import { getRequestAuth } from "@/lib/studio-data";
 import type {
   AssetLockWithProfile,
@@ -56,6 +57,10 @@ export async function getDashboardData(
   userId: string | null,
   teamProfiles: Profile[]
 ): Promise<DashboardData> {
+  "use cache: private";
+  cacheTag("studio:dashboard", "studio:tasks", "studio:ideas", "studio:locks", "studio:milestones");
+  cacheLife({ stale: 300, revalidate: 60, expire: 300 });
+
   const { isConfigured, supabase } = await getRequestAuth();
   if (!isConfigured || !supabase || !userId) return EMPTY_DASHBOARD;
 

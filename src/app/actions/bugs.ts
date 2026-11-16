@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import { sendDiscordNotification } from "@/lib/discord";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -102,6 +102,10 @@ export async function createBugAction(input: {
     ],
   });
 
+  updateTag("studio:bugs");
+  updateTag("studio:tasks");
+  updateTag("studio:milestones");
+  updateTag("studio:dashboard");
   revalidatePath("/bugs");
   revalidatePath("/tasks");
   revalidatePath("/milestones");

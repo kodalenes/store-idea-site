@@ -1,11 +1,22 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { sendDiscordNotification } from "@/lib/discord";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { IdeaCategory, IdeaStatus, TaskPriority } from "@/types/studio";
+
+function revalidateIdeasCache(ideaId?: string) {
+  updateTag("studio:ideas");
+  updateTag("studio:dashboard");
+  if (ideaId) {
+    updateTag(`idea:${ideaId}`);
+    revalidatePath(`/ideas/${ideaId}`);
+  }
+  revalidatePath("/ideas");
+  revalidatePath("/");
+}
 
 export interface ActionResult<T = undefined> {
   ok: boolean;
@@ -115,8 +126,7 @@ export async function createIdeaAction(input: {
     ],
   });
 
-  revalidatePath("/ideas");
-  revalidatePath("/");
+  revalidateIdeasCache(data.id);
   return { ok: true, data: { id: data.id } };
 }
 
@@ -161,8 +171,7 @@ export async function updateIdeaAction(
     return { ok: false, error: error.message };
   }
 
-  revalidatePath("/ideas");
-  revalidatePath(`/ideas/${ideaId}`);
+  revalidateIdeasCache(ideaId);
   return { ok: true };
 }
 
@@ -194,8 +203,7 @@ export async function updateIdeaStatusAction(
     });
   }
 
-  revalidatePath("/ideas");
-  revalidatePath(`/ideas/${ideaId}`);
+  revalidateIdeasCache(ideaId);
   return { ok: true };
 }
 
@@ -218,8 +226,7 @@ export async function deleteIdeaAction(ideaId: string): Promise<void> {
 
   await supabase.from("ideas").delete().eq("id", ideaId);
 
-  revalidatePath("/ideas");
-  revalidatePath("/");
+  revalidateIdeasCache();
   redirect("/ideas");
 }
 
@@ -245,8 +252,7 @@ export async function toggleIdeaVoteAction(
       .eq("idea_id", ideaId)
       .eq("user_id", user.id);
     if (error) return { ok: false, error: error.message };
-    revalidatePath("/ideas");
-    revalidatePath(`/ideas/${ideaId}`);
+    revalidateIdeasCache(ideaId);
     return { ok: true, data: { voted: false } };
   }
 
@@ -256,8 +262,7 @@ export async function toggleIdeaVoteAction(
 
   if (error) return { ok: false, error: error.message };
 
-  revalidatePath("/ideas");
-  revalidatePath(`/ideas/${ideaId}`);
+  revalidateIdeasCache(ideaId);
   return { ok: true, data: { voted: true } };
 }
 
@@ -284,8 +289,7 @@ export async function addIdeaCommentAction(
 
   if (error) return { ok: false, error: error.message };
 
-  revalidatePath(`/ideas/${ideaId}`);
-  revalidatePath("/ideas");
+  revalidateIdeasCache(ideaId);
   return { ok: true };
 }
 
@@ -305,8 +309,7 @@ export async function deleteIdeaCommentAction(
 
   if (error) return { ok: false, error: error.message };
 
-  revalidatePath(`/ideas/${ideaId}`);
-  revalidatePath("/ideas");
+  revalidateIdeasCache(ideaId);
   return { ok: true };
 }
 
@@ -336,8 +339,7 @@ export async function registerIdeaAttachmentAction(input: {
 
   if (error) return { ok: false, error: error.message };
 
-  revalidatePath(`/ideas/${input.ideaId}`);
-  revalidatePath("/ideas");
+  revalidateIdeasCache(input.ideaId);
   return { ok: true };
 }
 
@@ -359,8 +361,7 @@ export async function deleteIdeaAttachmentAction(
 
   if (error) return { ok: false, error: error.message };
 
-  revalidatePath(`/ideas/${ideaId}`);
-  revalidatePath("/ideas");
+  revalidateIdeasCache(ideaId);
   return { ok: true };
 }
 
@@ -421,9 +422,10 @@ export async function convertIdeaToTaskAction(input: {
     ],
   });
 
-  revalidatePath(`/ideas/${parsed.data.ideaId}`);
-  revalidatePath("/ideas");
+  updateTag("studio:tasks");
+  updateTag("studio:milestones");
+  revalidateIdeasCache(parsed.data.ideaId);
   revalidatePath("/tasks");
-  revalidatePath("/");
+  revalidatePath("/milestones");
   return { ok: true, data: { taskId: data.id } };
 }
