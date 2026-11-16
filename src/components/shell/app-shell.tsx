@@ -36,7 +36,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/tasks", label: "Görev Panosu", icon: KanbanSquare },
   { href: "/ideas", label: "Fikirler & GDD", icon: Lightbulb },
   { href: "/bugs", label: "Bug Raporları", icon: Bug },
-  { href: "/milestones", label: "Milestones", icon: Flag },
+  { href: "/milestones", label: "Roadmap & Sistemler", icon: Flag },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {

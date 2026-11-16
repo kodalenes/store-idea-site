@@ -30,6 +30,14 @@ export type StudioTabPath =
   | "/milestones"
   | "/settings";
 
+export type TaskBoardViewMode = "kanban" | "compact" | "list";
+
+function isTaskBoardViewMode(
+  value: string | null
+): value is TaskBoardViewMode {
+  return value === "kanban" || value === "compact" || value === "list";
+}
+
 const STUDIO_TAB_SET = new Set<string>([
   "/",
   "/tasks",
@@ -62,6 +70,8 @@ interface StudioStoreValue {
   isOnTabRoute: boolean;
   tasksMilestoneFilter: string;
   setTasksMilestoneFilter: Dispatch<SetStateAction<string>>;
+  tasksViewMode: TaskBoardViewMode;
+  setTasksViewMode: Dispatch<SetStateAction<TaskBoardViewMode>>;
   navigateTab: (href: string, options?: { milestoneId?: string }) => void;
 }
 
@@ -114,8 +124,23 @@ export function StudioStoreProvider({
 
   const [tasksMilestoneFilter, setTasksMilestoneFilter] =
     useState<string>("all");
+  const [tasksViewMode, setTasksViewModeState] =
+    useState<TaskBoardViewMode>("kanban");
 
-  // Tarayici geri/ileri (popstate) ve ilk URL ?milestone= parametresi senkronizasyonu
+  const setTasksViewMode: Dispatch<SetStateAction<TaskBoardViewMode>> =
+    useCallback((next) => {
+      setTasksViewModeState((prev) => {
+        const resolved = typeof next === "function" ? next(prev) : next;
+        try {
+          window.localStorage.setItem("studio-tasks-view", resolved);
+        } catch {
+          // localStorage erisim hatasinda sessiz kal
+        }
+        return resolved;
+      });
+    }, []);
+
+  // Tarayici geri/ileri (popstate), gorunum tercihi ve URL ?milestone= senkronizasyonu
   useEffect(() => {
     function syncFromLocation() {
       const path = window.location.pathname;
@@ -126,6 +151,14 @@ export function StudioStoreProvider({
       const ms = params.get("milestone");
       if (ms) {
         setTasksMilestoneFilter(ms);
+      }
+      try {
+        const savedView = window.localStorage.getItem("studio-tasks-view");
+        if (isTaskBoardViewMode(savedView)) {
+          setTasksViewModeState(savedView);
+        }
+      } catch {
+        // localStorage erisim hatasinda sessiz kal
       }
     }
 
@@ -202,6 +235,8 @@ export function StudioStoreProvider({
       isOnTabRoute,
       tasksMilestoneFilter,
       setTasksMilestoneFilter,
+      tasksViewMode,
+      setTasksViewMode,
       navigateTab,
     }),
     [
@@ -217,6 +252,8 @@ export function StudioStoreProvider({
       isOnTabRoute,
       clientTab,
       tasksMilestoneFilter,
+      tasksViewMode,
+      setTasksViewMode,
       navigateTab,
     ]
   );

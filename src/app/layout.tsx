@@ -22,9 +22,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="tr"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
     >
-      <body className="min-h-full bg-[#080a0f] text-[#e6ebf5] flex flex-col">
+      <head>
+        <meta name="darkreader-lock" />
+        <meta name="color-scheme" content="dark" />
+      </head>
+      <body
+        suppressHydrationWarning
+        className="min-h-full bg-[#080a0f] text-[#e6ebf5] flex flex-col"
+      >
         {children}
       </body>
     </html>

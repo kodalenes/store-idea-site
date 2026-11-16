@@ -240,14 +240,14 @@ export function TaskFormModal({
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <label className="block text-xs font-medium text-zinc-300">
-                Milestone
+                Oyun Sistemi / Hedef
               </label>
               <select
                 value={milestoneId}
                 onChange={(e) => setMilestoneId(e.target.value)}
                 className="w-full rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-2 text-xs text-zinc-100 focus:border-amber-500/60 focus:outline-none"
               >
-                <option value="">Milestone yok</option>
+                <option value="">Sistem seçilmedi</option>
                 {milestones.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.title}

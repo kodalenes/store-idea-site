@@ -263,7 +263,7 @@ export function DashboardView() {
               <div className="flex items-center gap-2">
                 <Flag className="h-4.5 w-4.5 text-amber-400" />
                 <h2 className="text-base font-semibold text-zinc-100">
-                  Aktif Milestones
+                  Aktif Sistemler & Roadmap
                 </h2>
               </div>
               <button

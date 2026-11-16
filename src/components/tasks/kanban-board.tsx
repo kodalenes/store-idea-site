@@ -18,6 +18,9 @@ import {
   Bug,
   Flag,
   RotateCcw,
+  KanbanSquare,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import {
   TASK_PRIORITIES,
@@ -48,7 +51,14 @@ const TaskDetailDrawer = dynamic(
     ),
   { ssr: false }
 );
-import type { TaskBoardItem, TaskStatus } from "@/types/studio";
+import type { TaskBoardItem, TaskPriority, TaskStatus } from "@/types/studio";
+
+const PRIORITY_DOTS: Record<TaskPriority, string> = {
+  critical: "bg-rose-400",
+  high: "bg-amber-400",
+  medium: "bg-cyan-400",
+  low: "bg-zinc-400",
+};
 
 export function KanbanBoard() {
   const {
@@ -62,6 +72,8 @@ export function KanbanBoard() {
     isConfigured,
     tasksMilestoneFilter,
     setTasksMilestoneFilter,
+    tasksViewMode,
+    setTasksViewMode,
   } = useStudioStore();
 
   // Filters
@@ -71,6 +83,9 @@ export function KanbanBoard() {
   const milestoneFilter = tasksMilestoneFilter;
   const setMilestoneFilter = setTasksMilestoneFilter;
   const [kindFilter, setKindFilter] = useState<"all" | "task" | "bug">("all");
+  const [listStatusFilter, setListStatusFilter] = useState<TaskStatus | "all">(
+    "all"
+  );
 
   // Drag state, Horizontal Pan & Mobile active column
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
@@ -414,15 +429,63 @@ export function KanbanBoard() {
           </p>
         </div>
 
-        <button
-          type="button"
-          disabled={!isConfigured}
-          onClick={() => setCreateStatus("todo")}
-          className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-xs font-semibold text-zinc-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Plus className="h-4 w-4" />
-          Yeni Görev Ekle
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div
+            role="group"
+            aria-label="Görünüm Modu"
+            className="inline-flex rounded-lg border border-[#242e40] bg-[#0c1018] p-0.5 text-xs"
+          >
+            <button
+              type="button"
+              onClick={() => setTasksViewMode("kanban")}
+              title="Standart Kanban"
+              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
+                tasksViewMode === "kanban"
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              <KanbanSquare className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Kanban</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTasksViewMode("compact")}
+              title="Kompakt Kanban"
+              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
+                tasksViewMode === "compact"
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Kompakt</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTasksViewMode("list")}
+              title="Tek Satır Liste"
+              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
+                tasksViewMode === "list"
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              <List className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Liste</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            disabled={!isConfigured}
+            onClick={() => setCreateStatus("todo")}
+            className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-xs font-semibold text-zinc-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" />
+            Yeni Görev Ekle
+          </button>
+        </div>
       </div>
 
       {boardError && (
@@ -511,7 +574,7 @@ export function KanbanBoard() {
           onChange={(e) => setMilestoneFilter(e.target.value)}
           className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
         >
-          <option value="all">Milestone: Tümü</option>
+          <option value="all">Sistem / Hedef: Tümü</option>
           {milestones.map((m) => (
             <option key={m.id} value={m.id}>
               {m.title}
@@ -543,210 +606,184 @@ export function KanbanBoard() {
         )}
       </div>
 
-      {/* Mobile Column Switcher Tabs */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 md:hidden">
-        {TASK_STATUSES.map((col) => {
-          const count = filteredTasks.filter((t) => t.status === col.value).length;
-          const active = mobileActiveColumn === col.value;
-          return (
+      {tasksViewMode === "list" ? (
+        <div className="space-y-3">
+          {/* Status Summary Filter Pills */}
+          <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-[#1f2735] bg-[#0c1018] p-2 text-xs">
             <button
-              key={col.value}
               type="button"
-              onClick={() => setMobileActiveColumn(col.value)}
-              className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-                active
-                  ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
-                  : "border-[#1f2735] bg-[#0c1018] text-zinc-400"
+              onClick={() => setListStatusFilter("all")}
+              className={`rounded-lg px-2.5 py-1.5 font-medium transition ${
+                listStatusFilter === "all"
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "text-zinc-400 hover:bg-[#141a26] hover:text-zinc-200"
               }`}
             >
-              {col.label} ({count})
+              Tümü ({filteredTasks.length})
             </button>
-          );
-        })}
-      </div>
-
-      {/* Kanban Columns (bounded height + internal vertical scroll + left-click horizontal pan) */}
-      <div
-        ref={boardScrollRef}
-        onMouseDown={handleBoardMouseDown}
-        className={`flex flex-col gap-4 pb-2 md:h-[calc(100dvh-210px)] md:min-h-[480px] md:flex-row md:overflow-x-auto md:overflow-y-hidden ${
-          isPanning ? "md:cursor-grabbing select-none" : "md:cursor-grab"
-        }`}
-      >
-        {TASK_STATUSES.map((column) => {
-          const columnTasks = filteredTasks.filter(
-            (t) => t.status === column.value
-          );
-          const isDropTarget = dragOverColumn === column.value;
-          const isMobileActive = mobileActiveColumn === column.value;
-
-          return (
-            <div
-              key={column.value}
-              onDragOver={(e) => {
-                e.preventDefault();
-                if (dragOverColumn !== column.value) {
-                  setDragOverColumn(column.value);
-                }
-              }}
-              onDragLeave={() => {
-                if (dragOverColumn === column.value) {
-                  setDragOverColumn(null);
-                }
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                handleDropOnColumn(column.value);
-              }}
-              className={`${
-                isMobileActive ? "flex" : "hidden md:flex"
-              } min-h-[340px] w-full flex-col overflow-hidden rounded-xl border bg-[#0c1018] transition md:h-full md:w-76 md:shrink-0 ${
-                isDropTarget
-                  ? "border-amber-400/70 bg-amber-500/5"
-                  : `border-[#1f2735] border-t-2 ${column.accentClass}`
-              }`}
-            >
-              {/* Column Header */}
-              <div className="flex shrink-0 items-center justify-between border-b border-[#1a2130] px-3.5 py-3">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-200">
-                    {column.label}
-                  </h2>
-                  <span className="rounded-full bg-[#171e2c] px-2 py-0.5 font-mono text-[11px] text-zinc-400">
-                    {columnTasks.length}
-                  </span>
-                </div>
+            {TASK_STATUSES.map((st) => {
+              const count = filteredTasks.filter(
+                (t) => t.status === st.value
+              ).length;
+              return (
                 <button
+                  key={st.value}
                   type="button"
-                  disabled={!isConfigured}
-                  onClick={() => setCreateStatus(column.value)}
-                  className="rounded-md p-1 text-zinc-400 hover:bg-[#171e2c] hover:text-amber-300 disabled:opacity-40"
-                  title={`${column.label} sütununa ekle`}
+                  onClick={() => setListStatusFilter(st.value)}
+                  className={`rounded-lg px-2.5 py-1.5 font-medium transition ${
+                    listStatusFilter === st.value
+                      ? "bg-[#1a2232] text-zinc-100"
+                      : "text-zinc-400 hover:bg-[#141a26] hover:text-zinc-200"
+                  }`}
                 >
-                  <Plus className="h-4 w-4" />
+                  {st.label} ({count})
                 </button>
-              </div>
+              );
+            })}
+          </div>
 
-              {/* Column Cards (vertical wheel scroll inside column) */}
-              <div className="flex-1 space-y-2.5 overflow-y-auto overscroll-contain p-3">
-                {columnTasks.length === 0 ? (
-                  <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-[#1e2636] text-[11px] text-zinc-600">
-                    Kart yok
-                  </div>
-                ) : (
-                  columnTasks.map((task) => {
-                    const priorityMeta =
-                      TASK_PRIORITIES.find((p) => p.value === task.priority) ??
-                      TASK_PRIORITIES[1];
-                    const isBlocked =
-                      Boolean(task.blocked_by_task) &&
-                      task.blocked_by_task?.status !== "done";
-                    const doneSubtasks = task.subtasks.filter(
-                      (s) => s.is_done
-                    ).length;
+          {/* Single-Line List Rows */}
+          {(() => {
+            const visibleListTasks =
+              listStatusFilter === "all"
+                ? filteredTasks
+                : filteredTasks.filter((t) => t.status === listStatusFilter);
 
-                    return (
+            if (visibleListTasks.length === 0) {
+              return (
+                <div className="flex h-36 items-center justify-center rounded-xl border border-dashed border-[#242e40] bg-[#0c1018] text-xs text-zinc-500">
+                  Bu görünümde eşleşen görev bulunamadı.
+                </div>
+              );
+            }
+
+            return (
+              <div className="max-h-[calc(100dvh-250px)] min-h-[320px] divide-y divide-[#192130] overflow-y-auto overscroll-contain rounded-xl border border-[#1f2735] bg-[#0c1018]">
+                {visibleListTasks.map((task) => {
+                  const isPending = task.id.startsWith("temp-");
+                  const priorityMeta =
+                    TASK_PRIORITIES.find((p) => p.value === task.priority) ??
+                    TASK_PRIORITIES[1];
+                  const isBlocked =
+                    Boolean(task.blocked_by_task) &&
+                    task.blocked_by_task?.status !== "done";
+                  const doneSubtasks = task.subtasks.filter(
+                    (s) => s.is_done
+                  ).length;
+
+                  return (
+                    <div
+                      key={task.id}
+                      onClick={() => {
+                        if (!isPending) setSelectedTaskId(task.id);
+                      }}
+                      className={`flex items-center gap-2.5 px-3.5 py-2 text-xs transition ${
+                        isPending
+                          ? "opacity-75"
+                          : "cursor-pointer hover:bg-[#131926]"
+                      }`}
+                    >
                       <div
-                        key={task.id}
-                        data-kanban-card="true"
-                        draggable
-                        onDragStart={() => setDraggedTaskId(task.id)}
-                        onDragEnd={() => {
-                          setDraggedTaskId(null);
-                          setDragOverColumn(null);
-                        }}
-                        onClick={() => setSelectedTaskId(task.id)}
-                        className={`cursor-pointer rounded-xl border border-[#1f2735] bg-[#121722] p-3.5 transition hover:border-amber-500/50 hover:bg-[#161c29] ${
-                          draggedTaskId === task.id ? "opacity-50" : ""
-                        }`}
+                        className="shrink-0"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        {/* Top badges */}
-                        <div className="flex flex-wrap items-center justify-between gap-1.5">
-                          <div className="flex items-center gap-1.5">
-                            {task.kind === "bug" && (
-                              <span className="inline-flex items-center gap-1 rounded bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-rose-300">
-                                <Bug className="h-3 w-3" />
-                                Bug
-                              </span>
-                            )}
-                            <span
-                              className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${priorityMeta.badgeClass}`}
-                            >
-                              {priorityMeta.label}
-                            </span>
-                          </div>
+                        <select
+                          aria-label="Durum"
+                          value={task.status}
+                          disabled={isPending}
+                          onChange={(e) =>
+                            handleMoveStatus(
+                              task.id,
+                              e.target.value as TaskStatus
+                            )
+                          }
+                          className="rounded-md border border-[#242e40] bg-[#080a0f] px-2 py-1 text-[11px] font-medium text-zinc-200 focus:border-amber-500/60 focus:outline-none disabled:opacity-50"
+                        >
+                          {TASK_STATUSES.map((s) => (
+                            <option key={s.value} value={s.value}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                          {task.milestone && (
-                            <span className="inline-flex items-center gap-1 text-[10px] text-cyan-300">
-                              <Flag className="h-2.5 w-2.5" />
-                              {task.milestone.title}
+                      <span
+                        className={`w-14 shrink-0 rounded border px-1.5 py-0.5 text-center text-[10px] font-medium ${priorityMeta.badgeClass}`}
+                      >
+                        {priorityMeta.label}
+                      </span>
+
+                      {task.kind === "bug" && (
+                        <span className="hidden shrink-0 items-center gap-1 rounded bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-rose-300 sm:inline-flex">
+                          <Bug className="h-3 w-3" />
+                          Bug
+                        </span>
+                      )}
+
+                      <span className="min-w-0 flex-1 truncate font-medium text-zinc-100">
+                        {task.title}
+                        {isPending && (
+                          <span className="ml-2 text-[10px] font-normal text-amber-300/80">
+                            (Kaydediliyor...)
+                          </span>
+                        )}
+                      </span>
+
+                      {isBlocked && (
+                        <span
+                          title={`Bekliyor: ${task.blocked_by_task?.title}`}
+                          className="hidden shrink-0 items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-200 md:inline-flex"
+                        >
+                          <AlertTriangle className="h-3 w-3 text-amber-400" />
+                          Bekliyor
+                        </span>
+                      )}
+
+                      {task.milestone && (
+                        <span className="hidden max-w-36 shrink-0 items-center gap-1 truncate rounded bg-[#141c2b] px-2 py-0.5 text-[10px] text-cyan-300 sm:inline-flex">
+                          <Flag className="h-2.5 w-2.5 shrink-0" />
+                          <span className="truncate">
+                            {task.milestone.title}
+                          </span>
+                        </span>
+                      )}
+
+                      {task.ue_tags.length > 0 && (
+                        <div className="hidden shrink-0 items-center gap-1 lg:flex">
+                          {task.ue_tags.slice(0, 2).map((tag) => (
+                            <span
+                              key={tag}
+                              className="rounded bg-[#1b2232] px-1.5 py-0.5 text-[10px] text-zinc-300"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                          {task.ue_tags.length > 2 && (
+                            <span className="rounded bg-[#1b2232] px-1.5 py-0.5 text-[10px] text-zinc-400">
+                              +{task.ue_tags.length - 2}
                             </span>
                           )}
                         </div>
+                      )}
 
-                        <h3 className="mt-2 text-xs font-semibold leading-snug text-zinc-100">
-                          {task.title}
-                        </h3>
-
-                        {isBlocked && (
-                          <div className="mt-2 flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-200">
-                            <AlertTriangle className="h-3 w-3 shrink-0 text-amber-400" />
-                            <span className="truncate">
-                              Bekliyor: {task.blocked_by_task?.title}
-                            </span>
-                          </div>
+                      <div className="hidden shrink-0 items-center gap-2 text-[11px] text-zinc-400 md:flex">
+                        {task.subtasks.length > 0 && (
+                          <span className="inline-flex items-center gap-1">
+                            <CheckSquare className="h-3 w-3 text-emerald-400" />
+                            {doneSubtasks}/{task.subtasks.length}
+                          </span>
                         )}
-
-                        {task.ue_tags.length > 0 && (
-                          <div className="mt-2.5 flex flex-wrap gap-1">
-                            {task.ue_tags.slice(0, 3).map((tag) => (
-                              <span
-                                key={tag}
-                                className="rounded bg-[#1b2232] px-1.5 py-0.5 text-[10px] text-zinc-300"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                            {task.ue_tags.length > 3 && (
-                              <span className="rounded bg-[#1b2232] px-1.5 py-0.5 text-[10px] text-zinc-400">
-                                +{task.ue_tags.length - 3}
-                              </span>
-                            )}
-                          </div>
+                        {task.comment_count > 0 && (
+                          <span className="inline-flex items-center gap-1">
+                            <MessageSquare className="h-3 w-3" />
+                            {task.comment_count}
+                          </span>
                         )}
+                      </div>
 
-                        {/* Card Footer */}
-                        <div className="mt-3 flex items-center justify-between border-t border-[#1d2534] pt-2.5 text-[11px] text-zinc-400">
-                          <div className="flex items-center gap-2.5">
-                            {task.subtasks.length > 0 && (
-                              <span className="inline-flex items-center gap-1">
-                                <CheckSquare className="h-3 w-3 text-emerald-400" />
-                                {doneSubtasks}/{task.subtasks.length}
-                              </span>
-                            )}
-                            {task.comment_count > 0 && (
-                              <span className="inline-flex items-center gap-1">
-                                <MessageSquare className="h-3 w-3" />
-                                {task.comment_count}
-                              </span>
-                            )}
-                            {task.attachment_count > 0 && (
-                              <span className="inline-flex items-center gap-1">
-                                <Paperclip className="h-3 w-3" />
-                                {task.attachment_count}
-                              </span>
-                            )}
-                            {task.source_idea && (
-                              <span
-                                title={`Fikir: ${task.source_idea.title}`}
-                                className="inline-flex items-center gap-0.5 text-amber-300"
-                              >
-                                <Lightbulb className="h-3 w-3" />
-                              </span>
-                            )}
-                          </div>
-
-                          {task.assignee ? (
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {task.assignee ? (
+                          <>
                             <span
                               title={task.assignee.display_name}
                               className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-zinc-950"
@@ -758,45 +795,416 @@ export function KanbanBoard() {
                                 .slice(0, 2)
                                 .toUpperCase()}
                             </span>
-                          ) : (
-                            <span className="text-[10px] text-zinc-600">
-                              Boşta
+                            <span className="hidden max-w-20 truncate text-[11px] text-zinc-300 xl:inline">
+                              {task.assignee.display_name}
                             </span>
-                          )}
-                        </div>
-
-                        {/* Mobil dokunmatik tek dokunusla sutun degistirici */}
-                        <div
-                          className="mt-2.5 border-t border-[#1a2130] pt-2 md:hidden"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <select
-                            aria-label="Sütun değiştir"
-                            value={task.status}
-                            onChange={(e) =>
-                              handleMoveStatus(
-                                task.id,
-                                e.target.value as TaskStatus
-                              )
-                            }
-                            className="w-full rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs font-medium text-zinc-200 focus:border-amber-500/60 focus:outline-none"
-                          >
-                            {TASK_STATUSES.map((s) => (
-                              <option key={s.value} value={s.value}>
-                                Taşı: {s.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                          </>
+                        ) : (
+                          <span className="text-[10px] text-zinc-600">
+                            Boşta
+                          </span>
+                        )}
                       </div>
-                    );
-                  })
-                )}
+                    </div>
+                  );
+                })}
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })()}
+        </div>
+      ) : (
+        <>
+          {/* Mobile Column Switcher Tabs */}
+          <div className="flex gap-1.5 overflow-x-auto pb-1 md:hidden">
+            {TASK_STATUSES.map((col) => {
+              const count = filteredTasks.filter(
+                (t) => t.status === col.value
+              ).length;
+              const active = mobileActiveColumn === col.value;
+              return (
+                <button
+                  key={col.value}
+                  type="button"
+                  onClick={() => setMobileActiveColumn(col.value)}
+                  className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                    active
+                      ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
+                      : "border-[#1f2735] bg-[#0c1018] text-zinc-400"
+                  }`}
+                >
+                  {col.label} ({count})
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Kanban Columns (bounded height + internal vertical scroll + left-click horizontal pan) */}
+          <div
+            ref={boardScrollRef}
+            onMouseDown={handleBoardMouseDown}
+            className={`flex flex-col gap-4 pb-2 md:h-[calc(100dvh-210px)] md:min-h-[480px] md:flex-row md:overflow-x-auto md:overflow-y-hidden ${
+              isPanning ? "md:cursor-grabbing select-none" : "md:cursor-grab"
+            }`}
+          >
+            {TASK_STATUSES.map((column) => {
+              const columnTasks = filteredTasks.filter(
+                (t) => t.status === column.value
+              );
+              const isDropTarget = dragOverColumn === column.value;
+              const isMobileActive = mobileActiveColumn === column.value;
+
+              return (
+                <div
+                  key={column.value}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (dragOverColumn !== column.value) {
+                      setDragOverColumn(column.value);
+                    }
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverColumn === column.value) {
+                      setDragOverColumn(null);
+                    }
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    handleDropOnColumn(column.value);
+                  }}
+                  className={`${
+                    isMobileActive ? "flex" : "hidden md:flex"
+                  } min-h-[340px] w-full flex-col overflow-hidden rounded-xl border bg-[#0c1018] transition md:h-full md:w-76 md:shrink-0 ${
+                    isDropTarget
+                      ? "border-amber-400/70 bg-amber-500/5"
+                      : `border-[#1f2735] border-t-2 ${column.accentClass}`
+                  }`}
+                >
+                  {/* Column Header */}
+                  <div className="flex shrink-0 items-center justify-between border-b border-[#1a2130] px-3.5 py-3">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-200">
+                        {column.label}
+                      </h2>
+                      <span className="rounded-full bg-[#171e2c] px-2 py-0.5 font-mono text-[11px] text-zinc-400">
+                        {columnTasks.length}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!isConfigured}
+                      onClick={() => setCreateStatus(column.value)}
+                      className="rounded-md p-1 text-zinc-400 hover:bg-[#171e2c] hover:text-amber-300 disabled:opacity-40"
+                      title={`${column.label} sütununa ekle`}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  {/* Column Cards (vertical wheel scroll inside column) */}
+                  <div
+                    className={`flex-1 overflow-y-auto overscroll-contain ${
+                      tasksViewMode === "compact"
+                        ? "space-y-1.5 p-2"
+                        : "space-y-2.5 p-3"
+                    }`}
+                  >
+                    {columnTasks.length === 0 ? (
+                      <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-[#1e2636] text-[11px] text-zinc-600">
+                        Kart yok
+                      </div>
+                    ) : (
+                      columnTasks.map((task) => {
+                        const isPending = task.id.startsWith("temp-");
+                        const priorityMeta =
+                          TASK_PRIORITIES.find(
+                            (p) => p.value === task.priority
+                          ) ?? TASK_PRIORITIES[1];
+                        const isBlocked =
+                          Boolean(task.blocked_by_task) &&
+                          task.blocked_by_task?.status !== "done";
+                        const doneSubtasks = task.subtasks.filter(
+                          (s) => s.is_done
+                        ).length;
+
+                        if (tasksViewMode === "compact") {
+                          return (
+                            <div
+                              key={task.id}
+                              data-kanban-card="true"
+                              draggable={!isPending}
+                              onDragStart={() => setDraggedTaskId(task.id)}
+                              onDragEnd={() => {
+                                setDraggedTaskId(null);
+                                setDragOverColumn(null);
+                              }}
+                              onClick={() => {
+                                if (!isPending) setSelectedTaskId(task.id);
+                              }}
+                              className={`rounded-lg border border-[#1f2735] bg-[#121722] px-2.5 py-2 transition ${
+                                isPending
+                                  ? "opacity-75"
+                                  : "cursor-pointer hover:border-amber-500/50 hover:bg-[#161c29]"
+                              } ${draggedTaskId === task.id ? "opacity-50" : ""}`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span
+                                  title={`Öncelik: ${priorityMeta.label}`}
+                                  className={`h-2 w-2 shrink-0 rounded-full ${
+                                    PRIORITY_DOTS[task.priority]
+                                  }`}
+                                />
+                                {task.kind === "bug" && (
+                                  <Bug
+                                    aria-label="Bug"
+                                    className="h-3 w-3 shrink-0 text-rose-400"
+                                  />
+                                )}
+                                {isBlocked && (
+                                  <span
+                                    title={`Bekliyor: ${task.blocked_by_task?.title}`}
+                                    className="shrink-0"
+                                  >
+                                    <AlertTriangle className="h-3 w-3 text-amber-400" />
+                                  </span>
+                                )}
+                                <h3 className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-100">
+                                  {task.title}
+                                </h3>
+                                {task.subtasks.length > 0 && (
+                                  <span className="shrink-0 font-mono text-[10px] text-zinc-400">
+                                    {doneSubtasks}/{task.subtasks.length}
+                                  </span>
+                                )}
+                                {task.assignee && (
+                                  <span
+                                    title={task.assignee.display_name}
+                                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-zinc-950"
+                                    style={{
+                                      backgroundColor:
+                                        task.assignee.avatar_color,
+                                    }}
+                                  >
+                                    {task.assignee.display_name
+                                      .slice(0, 2)
+                                      .toUpperCase()}
+                                  </span>
+                                )}
+                              </div>
+
+                              {(task.milestone ||
+                                task.ue_tags.length > 0 ||
+                                isPending) && (
+                                <div className="mt-1 flex items-center gap-1.5 truncate pl-4 text-[10px] text-zinc-500">
+                                  {task.milestone && (
+                                    <span className="truncate text-cyan-400/90">
+                                      {task.milestone.title}
+                                    </span>
+                                  )}
+                                  {task.ue_tags[0] && (
+                                    <span className="rounded bg-[#1a2130] px-1 text-[9px] text-zinc-400">
+                                      {task.ue_tags[0]}
+                                    </span>
+                                  )}
+                                  {isPending && (
+                                    <span className="text-amber-300/80">
+                                      Kaydediliyor...
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              <div
+                                className="mt-2 border-t border-[#1a2130] pt-1.5 md:hidden"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <select
+                                  aria-label="Sütun değiştir"
+                                  value={task.status}
+                                  disabled={isPending}
+                                  onChange={(e) =>
+                                    handleMoveStatus(
+                                      task.id,
+                                      e.target.value as TaskStatus
+                                    )
+                                  }
+                                  className="w-full rounded-md border border-[#242e40] bg-[#080a0f] px-2 py-1 text-[11px] font-medium text-zinc-200 focus:border-amber-500/60 focus:outline-none"
+                                >
+                                  {TASK_STATUSES.map((s) => (
+                                    <option key={s.value} value={s.value}>
+                                      Taşı: {s.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div
+                            key={task.id}
+                            data-kanban-card="true"
+                            draggable={!isPending}
+                            onDragStart={() => setDraggedTaskId(task.id)}
+                            onDragEnd={() => {
+                              setDraggedTaskId(null);
+                              setDragOverColumn(null);
+                            }}
+                            onClick={() => {
+                              if (!isPending) setSelectedTaskId(task.id);
+                            }}
+                            className={`rounded-xl border border-[#1f2735] bg-[#121722] p-3.5 transition ${
+                              isPending
+                                ? "opacity-75"
+                                : "cursor-pointer hover:border-amber-500/50 hover:bg-[#161c29]"
+                            } ${draggedTaskId === task.id ? "opacity-50" : ""}`}
+                          >
+                            {/* Top badges */}
+                            <div className="flex flex-wrap items-center justify-between gap-1.5">
+                              <div className="flex items-center gap-1.5">
+                                {task.kind === "bug" && (
+                                  <span className="inline-flex items-center gap-1 rounded bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-rose-300">
+                                    <Bug className="h-3 w-3" />
+                                    Bug
+                                  </span>
+                                )}
+                                <span
+                                  className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${priorityMeta.badgeClass}`}
+                                >
+                                  {priorityMeta.label}
+                                </span>
+                              </div>
+
+                              {task.milestone && (
+                                <span className="inline-flex items-center gap-1 text-[10px] text-cyan-300">
+                                  <Flag className="h-2.5 w-2.5" />
+                                  {task.milestone.title}
+                                </span>
+                              )}
+                            </div>
+
+                            <h3 className="mt-2 text-xs font-semibold leading-snug text-zinc-100">
+                              {task.title}
+                              {isPending && (
+                                <span className="ml-1.5 text-[10px] font-normal text-amber-300/80">
+                                  (Kaydediliyor...)
+                                </span>
+                              )}
+                            </h3>
+
+                            {isBlocked && (
+                              <div className="mt-2 flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-200">
+                                <AlertTriangle className="h-3 w-3 shrink-0 text-amber-400" />
+                                <span className="truncate">
+                                  Bekliyor: {task.blocked_by_task?.title}
+                                </span>
+                              </div>
+                            )}
+
+                            {task.ue_tags.length > 0 && (
+                              <div className="mt-2.5 flex flex-wrap gap-1">
+                                {task.ue_tags.slice(0, 3).map((tag) => (
+                                  <span
+                                    key={tag}
+                                    className="rounded bg-[#1b2232] px-1.5 py-0.5 text-[10px] text-zinc-300"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                                {task.ue_tags.length > 3 && (
+                                  <span className="rounded bg-[#1b2232] px-1.5 py-0.5 text-[10px] text-zinc-400">
+                                    +{task.ue_tags.length - 3}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Card Footer */}
+                            <div className="mt-3 flex items-center justify-between border-t border-[#1d2534] pt-2.5 text-[11px] text-zinc-400">
+                              <div className="flex items-center gap-2.5">
+                                {task.subtasks.length > 0 && (
+                                  <span className="inline-flex items-center gap-1">
+                                    <CheckSquare className="h-3 w-3 text-emerald-400" />
+                                    {doneSubtasks}/{task.subtasks.length}
+                                  </span>
+                                )}
+                                {task.comment_count > 0 && (
+                                  <span className="inline-flex items-center gap-1">
+                                    <MessageSquare className="h-3 w-3" />
+                                    {task.comment_count}
+                                  </span>
+                                )}
+                                {task.attachment_count > 0 && (
+                                  <span className="inline-flex items-center gap-1">
+                                    <Paperclip className="h-3 w-3" />
+                                    {task.attachment_count}
+                                  </span>
+                                )}
+                                {task.source_idea && (
+                                  <span
+                                    title={`Fikir: ${task.source_idea.title}`}
+                                    className="inline-flex items-center gap-0.5 text-amber-300"
+                                  >
+                                    <Lightbulb className="h-3 w-3" />
+                                  </span>
+                                )}
+                              </div>
+
+                              {task.assignee ? (
+                                <span
+                                  title={task.assignee.display_name}
+                                  className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-zinc-950"
+                                  style={{
+                                    backgroundColor:
+                                      task.assignee.avatar_color,
+                                  }}
+                                >
+                                  {task.assignee.display_name
+                                    .slice(0, 2)
+                                    .toUpperCase()}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-zinc-600">
+                                  Boşta
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Mobil dokunmatik tek dokunusla sutun degistirici */}
+                            <div
+                              className="mt-2.5 border-t border-[#1a2130] pt-2 md:hidden"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <select
+                                aria-label="Sütun değiştir"
+                                value={task.status}
+                                disabled={isPending}
+                                onChange={(e) =>
+                                  handleMoveStatus(
+                                    task.id,
+                                    e.target.value as TaskStatus
+                                  )
+                                }
+                                className="w-full rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs font-medium text-zinc-200 focus:border-amber-500/60 focus:outline-none"
+                              >
+                                {TASK_STATUSES.map((s) => (
+                                  <option key={s.value} value={s.value}>
+                                    Taşı: {s.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {/* Create Task Modal */}
       {createStatus && (
