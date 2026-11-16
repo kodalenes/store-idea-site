@@ -21,6 +21,8 @@ import {
   KanbanSquare,
   LayoutGrid,
   List,
+  Users,
+  BarChart3,
 } from "lucide-react";
 import {
   TASK_PRIORITIES,
@@ -204,6 +206,48 @@ export function KanbanBoard() {
     () => tasks.find((t) => t.id === selectedTaskId) ?? null,
     [tasks, selectedTaskId]
   );
+
+  const boardSummary = useMemo(() => {
+    const total = filteredTasks.length;
+    const done = filteredTasks.filter((t) => t.status === "done").length;
+    const testing = filteredTasks.filter((t) => t.status === "testing").length;
+    const inProgress = filteredTasks.filter(
+      (t) => t.status === "in_progress"
+    ).length;
+    const todo = filteredTasks.filter((t) => t.status === "todo").length;
+    const backlog = filteredTasks.filter((t) => t.status === "backlog").length;
+    const blockedCount = filteredTasks.filter(
+      (t) => Boolean(t.blocked_by_task) && t.blocked_by_task?.status !== "done"
+    ).length;
+    const openBugsCount = filteredTasks.filter(
+      (t) => t.kind === "bug" && t.status !== "done"
+    ).length;
+    const completionPercent = total > 0 ? Math.round((done / total) * 100) : 0;
+
+    const workload = teamProfiles.map((member) => ({
+      member,
+      openCount: tasks.filter(
+        (t) => t.assignee_id === member.id && t.status !== "done"
+      ).length,
+    }));
+    const unassignedOpenCount = tasks.filter(
+      (t) => !t.assignee_id && t.status !== "done"
+    ).length;
+
+    return {
+      total,
+      done,
+      testing,
+      inProgress,
+      todo,
+      backlog,
+      blockedCount,
+      openBugsCount,
+      completionPercent,
+      workload,
+      unassignedOpenCount,
+    };
+  }, [filteredTasks, tasks, teamProfiles]);
 
   async function handleMoveStatus(taskId: string, targetStatus: TaskStatus) {
     const prevTask = tasks.find((t) => t.id === taskId);
@@ -416,7 +460,7 @@ export function KanbanBoard() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-8">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -658,7 +702,7 @@ export function KanbanBoard() {
             }
 
             return (
-              <div className="max-h-[calc(100dvh-250px)] min-h-[320px] divide-y divide-[#192130] overflow-y-auto overscroll-contain rounded-xl border border-[#1f2735] bg-[#0c1018]">
+              <div className="max-h-[460px] min-h-[240px] divide-y divide-[#192130] overflow-y-auto overscroll-contain rounded-xl border border-[#1f2735] bg-[#0c1018] xl:max-h-[500px]">
                 {visibleListTasks.map((task) => {
                   const isPending = task.id.startsWith("temp-");
                   const priorityMeta =
@@ -842,7 +886,7 @@ export function KanbanBoard() {
           <div
             ref={boardScrollRef}
             onMouseDown={handleBoardMouseDown}
-            className={`flex flex-col gap-4 pb-2 md:h-[calc(100dvh-210px)] md:min-h-[480px] md:flex-row md:overflow-x-auto md:overflow-y-hidden ${
+            className={`flex flex-col gap-4 pb-2 md:h-[480px] md:flex-row md:overflow-x-auto md:overflow-y-hidden xl:h-[520px] ${
               isPanning ? "md:cursor-grabbing select-none" : "md:cursor-grab"
             }`}
           >
@@ -873,7 +917,7 @@ export function KanbanBoard() {
                   }}
                   className={`${
                     isMobileActive ? "flex" : "hidden md:flex"
-                  } min-h-[340px] w-full flex-col overflow-hidden rounded-xl border bg-[#0c1018] transition md:h-full md:w-76 md:shrink-0 ${
+                  } max-h-[420px] min-h-[260px] w-full flex-col overflow-hidden rounded-xl border bg-[#0c1018] transition md:h-full md:max-h-none md:w-76 md:shrink-0 ${
                     isDropTarget
                       ? "border-amber-400/70 bg-amber-500/5"
                       : `border-[#1f2735] border-t-2 ${column.accentClass}`
@@ -1205,6 +1249,164 @@ export function KanbanBoard() {
           </div>
         </>
       )}
+
+      {/* Pano İlerleme & Ekip İş Yükü Özeti */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="rounded-xl border border-[#1f2735] bg-[#0c1018] p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
+              <BarChart3 className="h-4 w-4 text-amber-400" />
+              <span>Pano İlerleme & Durum Dağılımı</span>
+            </div>
+            <span className="font-mono text-xs font-bold text-amber-300">
+              %{boardSummary.completionPercent} ({boardSummary.done}/
+              {boardSummary.total})
+            </span>
+          </div>
+
+          <div className="mt-3 flex h-2 w-full overflow-hidden rounded-full bg-[#171e2c]">
+            {boardSummary.total > 0 && (
+              <>
+                {boardSummary.done > 0 && (
+                  <div
+                    title={`Tamamlandı: ${boardSummary.done}`}
+                    className="h-full bg-emerald-400 transition-all duration-300"
+                    style={{
+                      width: `${(boardSummary.done / boardSummary.total) * 100}%`,
+                    }}
+                  />
+                )}
+                {boardSummary.testing > 0 && (
+                  <div
+                    title={`Testte: ${boardSummary.testing}`}
+                    className="h-full bg-purple-400 transition-all duration-300"
+                    style={{
+                      width: `${(boardSummary.testing / boardSummary.total) * 100}%`,
+                    }}
+                  />
+                )}
+                {boardSummary.inProgress > 0 && (
+                  <div
+                    title={`Geliştiriliyor: ${boardSummary.inProgress}`}
+                    className="h-full bg-amber-400 transition-all duration-300"
+                    style={{
+                      width: `${(boardSummary.inProgress / boardSummary.total) * 100}%`,
+                    }}
+                  />
+                )}
+                {boardSummary.todo > 0 && (
+                  <div
+                    title={`Yapılacak: ${boardSummary.todo}`}
+                    className="h-full bg-cyan-400 transition-all duration-300"
+                    style={{
+                      width: `${(boardSummary.todo / boardSummary.total) * 100}%`,
+                    }}
+                  />
+                )}
+              </>
+            )}
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-[#1d2534] bg-[#10141d] px-2 py-1">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              Bitti:{" "}
+              <strong className="text-zinc-100">{boardSummary.done}</strong>
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-[#1d2534] bg-[#10141d] px-2 py-1">
+              <span className="h-2 w-2 rounded-full bg-purple-400" />
+              Testte:{" "}
+              <strong className="text-zinc-100">{boardSummary.testing}</strong>
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-[#1d2534] bg-[#10141d] px-2 py-1">
+              <span className="h-2 w-2 rounded-full bg-amber-400" />
+              Geliştiriliyor:{" "}
+              <strong className="text-zinc-100">
+                {boardSummary.inProgress}
+              </strong>
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-[#1d2534] bg-[#10141d] px-2 py-1">
+              <span className="h-2 w-2 rounded-full bg-cyan-400" />
+              Yapılacak:{" "}
+              <strong className="text-zinc-100">{boardSummary.todo}</strong>
+            </span>
+            {boardSummary.blockedCount > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-amber-200">
+                <AlertTriangle className="h-3 w-3 text-amber-400" />
+                Blokeli: <strong>{boardSummary.blockedCount}</strong>
+              </span>
+            )}
+            {boardSummary.openBugsCount > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-rose-200">
+                <Bug className="h-3 w-3 text-rose-400" />
+                Açık Bug: <strong>{boardSummary.openBugsCount}</strong>
+              </span>
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-[#1f2735] bg-[#0c1018] p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
+              <Users className="h-4 w-4 text-cyan-400" />
+              <span>Ekip İş Yükü</span>
+            </div>
+            <span className="text-[11px] text-zinc-500">
+              Filtrelemek için tıkla
+            </span>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {boardSummary.workload.map(({ member, openCount }) => {
+              const isSelected = assigneeFilter === member.id;
+              return (
+                <button
+                  key={member.id}
+                  type="button"
+                  onClick={() =>
+                    setAssigneeFilter(isSelected ? "all" : member.id)
+                  }
+                  className={`inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition ${
+                    isSelected
+                      ? "border-amber-500/50 bg-amber-500/15 text-amber-200"
+                      : "border-[#1d2534] bg-[#10141d] text-zinc-300 hover:border-amber-500/30 hover:text-zinc-100"
+                  }`}
+                >
+                  <span
+                    className="flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-zinc-950"
+                    style={{ backgroundColor: member.avatar_color }}
+                  >
+                    {member.display_name.slice(0, 2).toUpperCase()}
+                  </span>
+                  <span className="font-medium">{member.display_name}</span>
+                  <span className="rounded bg-[#080a0f] px-1.5 py-0.5 font-mono text-[10px] text-zinc-300">
+                    {openCount} açık
+                  </span>
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={() =>
+                setAssigneeFilter(
+                  assigneeFilter === "unassigned" ? "all" : "unassigned"
+                )
+              }
+              className={`inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition ${
+                assigneeFilter === "unassigned"
+                  ? "border-amber-500/50 bg-amber-500/15 text-amber-200"
+                  : "border-[#1d2534] bg-[#10141d] text-zinc-400 hover:border-zinc-500/40 hover:text-zinc-200"
+              }`}
+            >
+              <span>Atanmamış</span>
+              <span className="rounded bg-[#080a0f] px-1.5 py-0.5 font-mono text-[10px] text-zinc-300">
+                {boardSummary.unassignedOpenCount}
+              </span>
+            </button>
+          </div>
+        </section>
+      </div>
 
       {/* Create Task Modal */}
       {createStatus && (
