@@ -74,6 +74,9 @@ interface StudioStoreValue {
   markDriveNotificationsRead: () => void;
   liveDriveToast: DriveAssetEvent | null;
   dismissDriveToast: () => void;
+  driveFolderId: string;
+  setDriveFolderId: (value: string) => void;
+  driveFolderUrl: string;
   activeTab: StudioTabPath;
   isOnTabRoute: boolean;
   tasksMilestoneFilter: string;
@@ -148,10 +151,39 @@ export function StudioStoreProvider({
     }
   }
 
+const DEFAULT_DRIVE_FOLDER_ID = "1_eG_uHfIqArDnBMCAR_0ExyM8pcefctH";
+
   const [tasksMilestoneFilter, setTasksMilestoneFilter] =
     useState<string>("all");
   const [tasksViewMode, setTasksViewModeState] =
     useState<TaskBoardViewMode>("kanban");
+  const [driveFolderId, setDriveFolderIdState] = useState<string>(
+    DEFAULT_DRIVE_FOLDER_ID
+  );
+
+  const setDriveFolderId = useCallback((rawValue: string) => {
+    const trimmed = rawValue.trim();
+    const match = trimmed.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+    const normalized = match ? match[1] : trimmed;
+    setDriveFolderIdState(normalized);
+    try {
+      if (normalized) {
+        window.localStorage.setItem("studio-drive-folder-id", normalized);
+      } else {
+        window.localStorage.removeItem("studio-drive-folder-id");
+      }
+    } catch {
+      // localStorage erisim hatasinda sessiz kal
+    }
+  }, []);
+
+  const driveFolderUrl = useMemo(() => {
+    const id = driveFolderId.trim();
+    if (!id || id.includes("/") || id.includes(":")) {
+      return `https://drive.google.com/drive/folders/${DEFAULT_DRIVE_FOLDER_ID}`;
+    }
+    return `https://drive.google.com/drive/folders/${id}`;
+  }, [driveFolderId]);
 
   const setTasksViewMode: Dispatch<SetStateAction<TaskBoardViewMode>> =
     useCallback((next) => {
@@ -188,6 +220,12 @@ export function StudioStoreProvider({
         );
         if (savedSeen) {
           setLastSeenDriveAt(savedSeen);
+        }
+        const savedFolderId = window.localStorage.getItem(
+          "studio-drive-folder-id"
+        );
+        if (savedFolderId) {
+          setDriveFolderIdState(savedFolderId);
         }
       } catch {
         // localStorage erisim hatasinda sessiz kal
@@ -300,6 +338,9 @@ export function StudioStoreProvider({
       markDriveNotificationsRead,
       liveDriveToast,
       dismissDriveToast,
+      driveFolderId,
+      setDriveFolderId,
+      driveFolderUrl,
       activeTab: isOnTabRoute ? clientTab : "/",
       isOnTabRoute,
       tasksMilestoneFilter,
@@ -323,6 +364,9 @@ export function StudioStoreProvider({
       markDriveNotificationsRead,
       liveDriveToast,
       dismissDriveToast,
+      driveFolderId,
+      setDriveFolderId,
+      driveFolderUrl,
       isOnTabRoute,
       clientTab,
       tasksMilestoneFilter,
@@ -363,7 +407,11 @@ export function StudioStoreProvider({
                 {liveDriveToast.folder_name} • {liveDriveToast.uploaded_by_name}
               </p>
               <a
-                href={liveDriveToast.web_view_link}
+                href={
+                  liveDriveToast.web_view_link !== "https://drive.google.com"
+                    ? liveDriveToast.web_view_link
+                    : driveFolderUrl
+                }
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-amber-300 hover:text-amber-200"

@@ -64,6 +64,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     setDriveEvents,
     unreadDriveCount,
     markDriveNotificationsRead,
+    driveFolderUrl,
     activeTab,
     isOnTabRoute,
     navigateTab,
@@ -440,7 +441,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                           </p>
                         </div>
                         <a
-                          href={ev.web_view_link}
+                          href={
+                            ev.web_view_link !== "https://drive.google.com"
+                              ? ev.web_view_link
+                              : driveFolderUrl
+                          }
                           target="_blank"
                           rel="noopener noreferrer"
                           className="mt-1 inline-flex shrink-0 items-center gap-1 rounded-md border border-[#242e40] bg-[#0a0e15] px-2 py-1 text-[11px] font-medium text-cyan-300 hover:border-cyan-500/40"

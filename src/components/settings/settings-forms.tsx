@@ -48,6 +48,9 @@ export function SettingsForms() {
     milestones,
     setMilestones,
     setDriveEvents,
+    driveFolderId,
+    setDriveFolderId,
+    driveFolderUrl,
   } = useStudioStore();
 
   const siteOrigin = useSyncExternalStore(
@@ -85,7 +88,6 @@ export function SettingsForms() {
   } | null>(null);
   const [resettingDb, setResettingDb] = useState(false);
 
-  const [driveFolderInput, setDriveFolderInput] = useState("");
   const [driveSecretInput, setDriveSecretInput] = useState(
     "ue5-studio-drive-secret"
   );
@@ -96,7 +98,7 @@ export function SettingsForms() {
   } | null>(null);
   const [testingDrive, setTestingDrive] = useState(false);
 
-  const resolvedDriveFolderId = extractDriveFolderId(driveFolderInput);
+  const resolvedDriveFolderId = extractDriveFolderId(driveFolderId);
   const resolvedDriveSecret =
     driveSecretInput.trim() || "ue5-studio-drive-secret";
   const appsScriptCode = `const DRIVE_FOLDER_ID = "${resolvedDriveFolderId}";
@@ -154,7 +156,7 @@ function collectChangedFiles_(folder, folderPath, sinceMs, out) {
         mimeType: file.getMimeType(),
         size: file.getSize(),
         folderName: folderPath,
-        url: file.getUrl(),
+        url: file.getUrl() || folder.getUrl(),
         uploadedBy: ownerName,
         eventType: createdMs > sinceMs ? "created" : "updated",
       });
@@ -190,7 +192,7 @@ function collectChangedFiles_(folder, folderPath, sinceMs, out) {
       mime_type: "application/octet-stream",
       file_size: 14820352,
       folder_name: "Meshes / Weapons",
-      web_view_link: "https://drive.google.com",
+      web_view_link: driveFolderUrl,
       uploaded_by_name: currentProfile?.display_name ?? "Ekip Üyesi",
       event_type: "created",
       created_at: new Date().toISOString(),
@@ -200,7 +202,7 @@ function collectChangedFiles_(folder, folderPath, sinceMs, out) {
     setDriveEvents((prev) => [optimisticEvent, ...prev.slice(0, 24)]);
 
     try {
-      const res = await sendDriveTestNotificationAction();
+      const res = await sendDriveTestNotificationAction(driveFolderUrl);
       if (!res.ok) {
         setDriveEvents((prev) => prev.filter((ev) => ev.id !== tempId));
         setDriveTestStatus({ ok: false, message: res.message });
@@ -723,8 +725,8 @@ function collectChangedFiles_(folder, folderPath, sinceMs, out) {
             <input
               id="driveFolderId"
               type="text"
-              value={driveFolderInput}
-              onChange={(e) => setDriveFolderInput(e.target.value)}
+              value={driveFolderId}
+              onChange={(e) => setDriveFolderId(e.target.value)}
               placeholder="https://drive.google.com/drive/folders/1AbC..."
               className="w-full rounded-lg border border-[#242e40] bg-[#080a0f] px-3 py-2 font-mono text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-cyan-500/60 focus:outline-none"
             />

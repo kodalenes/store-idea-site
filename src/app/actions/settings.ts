@@ -263,7 +263,12 @@ export async function resetWorkspaceDataAction(): Promise<{
   return { ok: true };
 }
 
-export async function sendDriveTestNotificationAction(): Promise<{
+const DEFAULT_DRIVE_FOLDER_URL =
+  "https://drive.google.com/drive/folders/1_eG_uHfIqArDnBMCAR_0ExyM8pcefctH";
+
+export async function sendDriveTestNotificationAction(
+  folderUrl?: string
+): Promise<{
   ok: boolean;
   message: string;
   event?: DriveAssetEvent;
@@ -290,6 +295,19 @@ export async function sendDriveTestNotificationAction(): Promise<{
   const uploaderName =
     profile?.display_name ?? user.email?.split("@")[0] ?? "Ekip Üyesi";
 
+  const trimmedFolderUrl = folderUrl?.trim() ?? "";
+  const safeFolderUrl =
+    trimmedFolderUrl.startsWith("https://drive.google.com/") &&
+    trimmedFolderUrl !== "https://drive.google.com/"
+      ? trimmedFolderUrl
+      : DEFAULT_DRIVE_FOLDER_URL;
+
+  // Daha once genel linkle olusmus test kayitlarini da dogru klasore guncelle
+  await supabase
+    .from("drive_events")
+    .update({ web_view_link: safeFolderUrl })
+    .eq("web_view_link", "https://drive.google.com");
+
   const { data: inserted, error } = await supabase
     .from("drive_events")
     .insert({
@@ -298,7 +316,7 @@ export async function sendDriveTestNotificationAction(): Promise<{
       mime_type: "application/octet-stream",
       file_size: 14820352,
       folder_name: "Meshes / Weapons",
-      web_view_link: "https://drive.google.com",
+      web_view_link: safeFolderUrl,
       uploaded_by_name: uploaderName,
       event_type: "created",
     })
@@ -316,7 +334,7 @@ export async function sendDriveTestNotificationAction(): Promise<{
   updateTag("studio:snapshot");
   queueDiscordNotification({
     title: "📦 Test Drive Asset: SM_HeroSword_HighPoly.fbx",
-    description: "Google Drive bildirim bağlantısı test edildi.",
+    description: `[Google Drive Klasörünü Aç](${safeFolderUrl})`,
     color: 0x06b6d4,
     fields: [
       { name: "Klasör", value: "Meshes / Weapons", inline: true },

@@ -39,6 +39,7 @@ export function DashboardView() {
     ideas,
     milestones,
     driveEvents,
+    driveFolderUrl,
     navigateTab,
   } = useStudioStore();
 
@@ -401,7 +402,11 @@ export function DashboardView() {
                 driveEvents.slice(0, 5).map((ev) => (
                   <a
                     key={ev.id}
-                    href={ev.web_view_link}
+                    href={
+                      ev.web_view_link !== "https://drive.google.com"
+                        ? ev.web_view_link
+                        : driveFolderUrl
+                    }
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-between gap-3 rounded-xl border border-[#1b2332] bg-[#0a0e15] px-3.5 py-2.5 transition hover:border-cyan-500/40"
