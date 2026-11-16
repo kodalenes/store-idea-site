@@ -459,7 +459,7 @@ export function BugsBoard({
 
                   {/* Quick Status Selector (stops card click propagation) */}
                   <div
-                    className="flex items-center gap-2"
+                    className="flex w-full items-center gap-2 sm:w-auto"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <select
@@ -470,7 +470,7 @@ export function BugsBoard({
                           e.target.value as TaskStatus
                         )
                       }
-                      className="rounded-lg border border-[#2a3447] bg-[#080a0f] px-2.5 py-1.5 text-xs font-medium text-zinc-200 focus:border-amber-500/60 focus:outline-none"
+                      className="w-full rounded-lg border border-[#2a3447] bg-[#080a0f] px-2.5 py-1.5 text-xs font-medium text-zinc-200 focus:border-amber-500/60 focus:outline-none sm:w-auto"
                     >
                       {TASK_STATUSES.map((s) => (
                         <option key={s.value} value={s.value}>
@@ -537,9 +537,9 @@ export function BugsBoard({
               setCreateOpen(false);
             }
           }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-xs"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-2.5 sm:p-4 backdrop-blur-xs"
         >
-          <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[#242e40] bg-[#0e131c] shadow-2xl">
+          <div className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[#242e40] bg-[#0e131c] shadow-2xl">
             <div className="flex items-center justify-between border-b border-[#1f2735] px-6 py-4">
               <div className="flex items-center gap-2">
                 <Bug className="h-4.5 w-4.5 text-rose-400" />

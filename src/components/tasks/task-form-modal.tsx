@@ -115,8 +115,8 @@ export function TaskFormModal({
   const dependencyCandidates = allTasks.filter((t) => t.id !== editingTaskId);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-xs">
-      <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[#242e40] bg-[#0e131c] shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-2.5 sm:p-4 backdrop-blur-xs">
+      <div className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[#242e40] bg-[#0e131c] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[#1f2735] px-6 py-4">
           <h2 className="text-base font-semibold text-zinc-100">
             {mode === "create" ? "Yeni UE5 Görevi Oluştur" : "Görevi Düzenle"}

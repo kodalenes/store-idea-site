@@ -767,8 +767,8 @@ export function IdeaDetailView({
 
       {/* Convert Idea to Task Modal */}
       {convertOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-xs">
-          <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[#242e40] bg-[#0e131c] shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-2.5 sm:p-4 backdrop-blur-xs">
+          <div className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[#242e40] bg-[#0e131c] shadow-2xl">
             <div className="flex items-center justify-between border-b border-[#1f2735] px-6 py-4">
               <div className="flex items-center gap-2">
                 <KanbanSquare className="h-4.5 w-4.5 text-cyan-400" />

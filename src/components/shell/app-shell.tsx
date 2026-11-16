@@ -232,9 +232,9 @@ export function AppShell({
       </aside>
 
       {/* Main Content Column */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
         {/* Top Mobile Bar */}
-        <header className="flex items-center justify-between border-b border-[#1f2735] bg-[#0c1018] px-4 py-3 lg:hidden">
+        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-[#1f2735] bg-[#0c1018]/95 px-4 py-3 backdrop-blur-sm lg:hidden">
           <button
             type="button"
             onClick={() => setMobileMenuOpen(true)}

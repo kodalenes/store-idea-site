@@ -79,9 +79,11 @@ export function KanbanBoard({
   );
   const [kindFilter, setKindFilter] = useState<"all" | "task" | "bug">("all");
 
-  // Drag state
+  // Drag state & Mobile active column
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
+  const [mobileActiveColumn, setMobileActiveColumn] =
+    useState<TaskStatus>("todo");
 
   // Modals & Drawer
   const [createStatus, setCreateStatus] = useState<TaskStatus | null>(null);
@@ -156,18 +158,15 @@ export function KanbanBoard({
     [optimisticTasks, selectedTaskId]
   );
 
-  function handleDropOnColumn(targetStatus: TaskStatus) {
-    setDragOverColumn(null);
-    if (!draggedTaskId) return;
-    const task = optimisticTasks.find((t) => t.id === draggedTaskId);
-    setDraggedTaskId(null);
+  function handleMoveStatus(taskId: string, targetStatus: TaskStatus) {
+    const task = optimisticTasks.find((t) => t.id === taskId);
     if (!task || task.status === targetStatus) return;
 
     setBoardError(null);
     startTransition(async () => {
-      moveTaskOptimistic({ taskId: task.id, status: targetStatus });
+      moveTaskOptimistic({ taskId, status: targetStatus });
       try {
-        const res = await moveTaskStatusAction(task.id, targetStatus);
+        const res = await moveTaskStatusAction(taskId, targetStatus);
         if (!res.ok) {
           setBoardError(
             res.error ?? "Kart taşınamadı, eski sütununa geri alındı."
@@ -179,6 +178,14 @@ export function KanbanBoard({
         setBoardError("Bağlantı hatası: Kart taşıma işlemi geri alındı.");
       }
     });
+  }
+
+  function handleDropOnColumn(targetStatus: TaskStatus) {
+    setDragOverColumn(null);
+    if (!draggedTaskId) return;
+    const id = draggedTaskId;
+    setDraggedTaskId(null);
+    handleMoveStatus(id, targetStatus);
   }
 
   async function handleCreateSubmit(values: TaskFormValues) {
@@ -301,13 +308,36 @@ export function KanbanBoard({
         </div>
       </div>
 
+      {/* Mobile Column Switcher Tabs */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1 md:hidden">
+        {TASK_STATUSES.map((col) => {
+          const count = filteredTasks.filter((t) => t.status === col.value).length;
+          const active = mobileActiveColumn === col.value;
+          return (
+            <button
+              key={col.value}
+              type="button"
+              onClick={() => setMobileActiveColumn(col.value)}
+              className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                active
+                  ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
+                  : "border-[#1f2735] bg-[#0c1018] text-zinc-400"
+              }`}
+            >
+              {col.label} ({count})
+            </button>
+          );
+        })}
+      </div>
+
       {/* Kanban Columns */}
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="flex flex-col gap-4 pb-4 md:flex-row md:overflow-x-auto">
         {TASK_STATUSES.map((column) => {
           const columnTasks = filteredTasks.filter(
             (t) => t.status === column.value
           );
           const isDropTarget = dragOverColumn === column.value;
+          const isMobileActive = mobileActiveColumn === column.value;
 
           return (
             <div
@@ -327,7 +357,9 @@ export function KanbanBoard({
                 e.preventDefault();
                 handleDropOnColumn(column.value);
               }}
-              className={`flex min-h-[460px] w-72 shrink-0 flex-col rounded-xl border bg-[#0c1018] transition ${
+              className={`${
+                isMobileActive ? "flex" : "hidden md:flex"
+              } min-h-[340px] w-full flex-col rounded-xl border bg-[#0c1018] transition md:min-h-[460px] md:w-72 md:shrink-0 ${
                 isDropTarget
                   ? "border-amber-400/70 bg-amber-500/5"
                   : `border-[#1f2735] border-t-2 ${column.accentClass}`
@@ -489,6 +521,30 @@ export function KanbanBoard({
                               Boşta
                             </span>
                           )}
+                        </div>
+
+                        {/* Mobil dokunmatik tek dokunusla sutun degistirici */}
+                        <div
+                          className="mt-2.5 border-t border-[#1a2130] pt-2 md:hidden"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <select
+                            aria-label="Sütun değiştir"
+                            value={task.status}
+                            onChange={(e) =>
+                              handleMoveStatus(
+                                task.id,
+                                e.target.value as TaskStatus
+                              )
+                            }
+                            className="w-full rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs font-medium text-zinc-200 focus:border-amber-500/60 focus:outline-none"
+                          >
+                            {TASK_STATUSES.map((s) => (
+                              <option key={s.value} value={s.value}>
+                                Taşı: {s.label}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       </div>
                     );
