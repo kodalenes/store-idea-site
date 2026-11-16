@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { X, Plus, Trash2, Eye, Edit3, AlertCircle } from "lucide-react";
 import { IDEA_CATEGORIES, IDEA_STATUSES } from "@/lib/constants";
@@ -38,7 +38,7 @@ export function IdeaFormModal({
   mode: "create" | "edit";
   initialValues?: IdeaFormValues;
   onClose: () => void;
-  onSubmit: (values: IdeaFormValues) => Promise<{ ok: boolean; error?: string }>;
+  onSubmit: (values: IdeaFormValues) => Promise<{ ok: boolean; error?: string }> | void;
 }) {
   const [title, setTitle] = useState(initialValues?.title ?? "");
   const [summary, setSummary] = useState(initialValues?.summary ?? "");
@@ -55,8 +55,18 @@ export function IdeaFormModal({
   const [newLabel, setNewLabel] = useState("");
   const [newUrl, setNewUrl] = useState("");
   const [previewMode, setPreviewMode] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
 
   if (!open) return null;
 
@@ -73,30 +83,35 @@ export function IdeaFormModal({
     setNewUrl("");
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (title.trim().length < 2) {
+      setError("Fikir başlığı en az 2 karakter olmalı.");
+      return;
+    }
     setError(null);
-    setSubmitting(true);
-
-    const res = await onSubmit({
-      title,
+    const values: IdeaFormValues = {
+      title: title.trim(),
       summary,
       content_md: contentMd,
       category,
       status,
       reference_links: links,
-    });
+    };
 
-    setSubmitting(false);
-    if (!res.ok) {
-      setError(res.error ?? "Bir hata oluştu.");
-      return;
-    }
     onClose();
+    void onSubmit(values);
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-2.5 sm:p-4 backdrop-blur-xs">
+    <div
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+      className="fixed inset-0 z-60 flex items-center justify-center bg-black/75 p-2.5 sm:p-4 backdrop-blur-xs"
+    >
       <div className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[#242e40] bg-[#0e131c] shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#1f2735] px-6 py-4">
@@ -295,14 +310,9 @@ export function IdeaFormModal({
             </button>
             <button
               type="submit"
-              disabled={submitting}
-              className="rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-amber-400 disabled:opacity-50"
+              className="rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-amber-400"
             >
-              {submitting
-                ? "Kaydediliyor..."
-                : mode === "create"
-                  ? "Fikri Oluştur"
-                  : "Değişiklikleri Kaydet"}
+              {mode === "create" ? "Fikri Oluştur" : "Değişiklikleri Kaydet"}
             </button>
           </div>
         </form>

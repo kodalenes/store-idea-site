@@ -1,13 +1,7 @@
 import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { getRequestAuth } from "@/lib/studio-data";
-import type {
-  AssetLockWithProfile,
-  Idea,
-  Milestone,
-  Profile,
-  Task,
-} from "@/types/studio";
+import type { Idea, Milestone, Task } from "@/types/studio";
 
 export interface DashboardMilestoneSummary {
   id: string;
@@ -23,7 +17,6 @@ export interface DashboardData {
   counts: {
     ideas: number;
     openTasks: number;
-    locks: number;
     openBugs: number;
   };
   myTasks: Pick<
@@ -31,7 +24,6 @@ export interface DashboardData {
     "id" | "title" | "kind" | "status" | "priority" | "ue_tags"
   >[];
   activeMilestones: DashboardMilestoneSummary[];
-  activeLocks: AssetLockWithProfile[];
   recentIdeas: Pick<
     Idea,
     "id" | "title" | "category" | "status" | "updated_at"
@@ -39,10 +31,9 @@ export interface DashboardData {
 }
 
 const EMPTY_DASHBOARD: DashboardData = {
-  counts: { ideas: 0, openTasks: 0, locks: 0, openBugs: 0 },
+  counts: { ideas: 0, openTasks: 0, openBugs: 0 },
   myTasks: [],
   activeMilestones: [],
-  activeLocks: [],
   recentIdeas: [],
 };
 
@@ -54,11 +45,10 @@ const PRIORITY_WEIGHT: Record<Task["priority"], number> = {
 };
 
 export async function getDashboardData(
-  userId: string | null,
-  teamProfiles: Profile[]
+  userId: string | null
 ): Promise<DashboardData> {
   "use cache: private";
-  cacheTag("studio:dashboard", "studio:tasks", "studio:ideas", "studio:locks", "studio:milestones");
+  cacheTag("studio:dashboard", "studio:tasks", "studio:ideas", "studio:milestones");
   cacheLife({ stale: 300, revalidate: 60, expire: 300 });
 
   const { isConfigured, supabase } = await getRequestAuth();
@@ -67,12 +57,10 @@ export async function getDashboardData(
   const [
     ideasCountRes,
     openTasksCountRes,
-    locksCountRes,
     openBugsCountRes,
     myTasksRes,
     activeMilestonesRes,
     milestoneTasksRes,
-    activeLocksRes,
     recentIdeasRes,
   ] = await Promise.all([
     supabase.from("ideas").select("id", { count: "exact", head: true }),
@@ -81,7 +69,6 @@ export async function getDashboardData(
       .select("id", { count: "exact", head: true })
       .eq("kind", "task")
       .neq("status", "done"),
-    supabase.from("asset_locks").select("id", { count: "exact", head: true }),
     supabase
       .from("tasks")
       .select("id", { count: "exact", head: true })
@@ -105,18 +92,11 @@ export async function getDashboardData(
       .select("milestone_id, status")
       .not("milestone_id", "is", null),
     supabase
-      .from("asset_locks")
-      .select("id, asset_path, lock_type, locked_by, note, locked_at")
-      .order("locked_at", { ascending: false })
-      .limit(6),
-    supabase
       .from("ideas")
       .select("id, title, category, status, updated_at")
       .order("updated_at", { ascending: false })
       .limit(5),
   ]);
-
-  const profileMap = new Map(teamProfiles.map((p) => [p.id, p]));
 
   const myTasks = ((myTasksRes.data ?? []) as Pick<
     Task,
@@ -160,23 +140,14 @@ export async function getDashboardData(
     }
   );
 
-  const activeLocks: AssetLockWithProfile[] = (
-    (activeLocksRes.data ?? []) as AssetLockWithProfile[]
-  ).map((l) => ({
-    ...l,
-    owner: profileMap.get(l.locked_by) ?? null,
-  }));
-
   return {
     counts: {
       ideas: ideasCountRes.count ?? 0,
       openTasks: openTasksCountRes.count ?? 0,
-      locks: locksCountRes.count ?? 0,
       openBugs: openBugsCountRes.count ?? 0,
     },
     myTasks,
     activeMilestones,
-    activeLocks,
     recentIdeas: (recentIdeasRes.data ?? []) as Pick<
       Idea,
       "id" | "title" | "category" | "status" | "updated_at"

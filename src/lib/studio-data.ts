@@ -47,13 +47,13 @@ export const getRequestAuth = cache(async () => {
   }
 
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
 
   return {
     isConfigured: true as const,
     supabase,
-    user,
+    user: session?.user ?? null,
   };
 });
 

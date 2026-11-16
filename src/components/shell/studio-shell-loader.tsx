@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { getStudioContext } from "@/lib/studio-data";
+import { getInitialStudioSnapshot } from "@/lib/workspace-snapshot";
+import { StudioStoreProvider } from "@/components/studio/studio-store";
 import { AppShell } from "./app-shell";
 
 export async function StudioShellLoader({
@@ -7,6 +8,10 @@ export async function StudioShellLoader({
 }: {
   children: ReactNode;
 }) {
-  const context = await getStudioContext();
-  return <AppShell context={context}>{children}</AppShell>;
+  const snapshot = await getInitialStudioSnapshot();
+  return (
+    <StudioStoreProvider initialSnapshot={snapshot}>
+      <AppShell>{children}</AppShell>
+    </StudioStoreProvider>
+  );
 }

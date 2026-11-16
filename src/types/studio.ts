@@ -22,14 +22,6 @@ export type TaskPriority = "low" | "medium" | "high" | "critical";
 
 export type BugSeverity = "crash" | "gameplay" | "visual" | "audio" | "minor";
 
-export type AssetLockType =
-  | "level"
-  | "blueprint"
-  | "mesh"
-  | "animation"
-  | "material"
-  | "other";
-
 export type MilestoneStatus = "planned" | "active" | "completed";
 
 export interface Profile {
@@ -142,19 +134,6 @@ export interface Subtask {
   is_done: boolean;
   position: number;
   created_at: string;
-}
-
-export interface AssetLock {
-  id: string;
-  asset_path: string;
-  lock_type: AssetLockType;
-  locked_by: string;
-  note: string;
-  locked_at: string;
-}
-
-export interface AssetLockWithProfile extends AssetLock {
-  owner: Profile | null;
 }
 
 export interface IdeaDetail extends Idea {

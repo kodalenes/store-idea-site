@@ -5,9 +5,10 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { MilestoneStatus } from "@/types/studio";
 
-export interface MilestoneActionResult {
+export interface MilestoneActionResult<T = undefined> {
   ok: boolean;
   error?: string;
+  data?: T;
 }
 
 const milestoneSchema = z.object({
@@ -27,12 +28,12 @@ async function requireAuthSupabase() {
     return { supabase: null, user: null, error: "Supabase yapılandırılmamış." };
   }
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user) {
     return { supabase: null, user: null, error: "Oturum bulunamadı." };
   }
-  return { supabase, user, error: null };
+  return { supabase, user: session.user, error: null };
 }
 
 export async function createMilestoneAction(input: {
@@ -40,7 +41,7 @@ export async function createMilestoneAction(input: {
   description: string;
   target_date: string | null;
   status: MilestoneStatus;
-}): Promise<MilestoneActionResult> {
+}): Promise<MilestoneActionResult<{ id: string; created_at: string }>> {
   const parsed = milestoneSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -54,15 +55,21 @@ export async function createMilestoneAction(input: {
     return { ok: false, error: authError ?? "Yetkisiz." };
   }
 
-  const { error } = await supabase.from("milestones").insert({
-    title: parsed.data.title,
-    description: parsed.data.description,
-    target_date: parsed.data.target_date || null,
-    status: parsed.data.status,
-    created_by: user.id,
-  });
+  const { data, error } = await supabase
+    .from("milestones")
+    .insert({
+      title: parsed.data.title,
+      description: parsed.data.description,
+      target_date: parsed.data.target_date || null,
+      status: parsed.data.status,
+      created_by: user.id,
+    })
+    .select("id, created_at")
+    .single();
 
-  if (error) return { ok: false, error: error.message };
+  if (error || !data) {
+    return { ok: false, error: error?.message ?? "Milestone oluşturulamadı." };
+  }
 
   updateTag("studio:milestones");
   updateTag("studio:tasks");
@@ -70,7 +77,7 @@ export async function createMilestoneAction(input: {
   revalidatePath("/milestones");
   revalidatePath("/tasks");
   revalidatePath("/");
-  return { ok: true };
+  return { ok: true, data: { id: data.id, created_at: data.created_at } };
 }
 
 export async function updateMilestoneAction(

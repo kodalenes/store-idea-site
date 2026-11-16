@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
 import { UserCog, Sliders, CheckCircle2, AlertCircle, Send } from "lucide-react";
 import {
   sendDiscordTestAction,
@@ -9,38 +9,128 @@ import {
   type SettingsActionState,
 } from "@/app/actions/settings";
 import { AVATAR_COLORS, TEAM_ROLES_PRESETS } from "@/lib/constants";
+import { useStudioStore } from "@/components/studio/studio-store";
 import type { Profile, WorkspaceSettings } from "@/types/studio";
 
-export function SettingsForms({
-  isConfigured,
-  currentProfile,
-  workspace,
-  teamProfiles,
-}: {
-  isConfigured: boolean;
-  currentProfile: Profile | null;
-  workspace: WorkspaceSettings;
-  teamProfiles: Profile[];
-}) {
+export function SettingsForms() {
+  const {
+    isConfigured,
+    currentProfile,
+    workspace,
+    setWorkspace,
+    teamProfiles,
+    setTeamProfiles,
+  } = useStudioStore();
+
+  const [prevProfileColor, setPrevProfileColor] = useState(
+    currentProfile?.avatar_color
+  );
   const [selectedColor, setSelectedColor] = useState(
     currentProfile?.avatar_color ?? AVATAR_COLORS[0]
   );
+  if (prevProfileColor !== currentProfile?.avatar_color) {
+    setPrevProfileColor(currentProfile?.avatar_color);
+    if (currentProfile?.avatar_color) {
+      setSelectedColor(currentProfile.avatar_color);
+    }
+  }
 
-  const [profileState, profileAction, profilePending] = useActionState<
-    SettingsActionState,
-    FormData
-  >(updateMyProfileAction, null);
-
-  const [workspaceState, workspaceAction, workspacePending] = useActionState<
-    SettingsActionState,
-    FormData
-  >(updateWorkspaceSettingsAction, null);
+  const [profileState, setProfileState] = useState<SettingsActionState>(null);
+  const [workspaceState, setWorkspaceState] =
+    useState<SettingsActionState>(null);
 
   const [discordTestStatus, setDiscordTestStatus] = useState<{
     ok: boolean;
     message: string;
   } | null>(null);
   const [testingDiscord, setTestingDiscord] = useState(false);
+
+  async function handleProfileSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!currentProfile) return;
+
+    const formData = new FormData(e.currentTarget);
+    const displayName = String(formData.get("displayName") ?? "").trim();
+    const roleTitle = String(formData.get("roleTitle") ?? "").trim();
+    const avatarColor = String(formData.get("avatarColor") ?? selectedColor);
+
+    const prevTeam = teamProfiles;
+    const prevColor = currentProfile.avatar_color;
+    const optimisticProfile: Profile = {
+      ...currentProfile,
+      display_name: displayName || currentProfile.display_name,
+      role_title: roleTitle || currentProfile.role_title,
+      avatar_color: avatarColor,
+      updated_at: new Date().toISOString(),
+    };
+
+    // 0 ms Optimistic UI
+    setTeamProfiles((prev) =>
+      prev.map((p) => (p.id === currentProfile.id ? optimisticProfile : p))
+    );
+    setProfileState({ success: "Profilin güncellendi." });
+
+    try {
+      const res = await updateMyProfileAction(null, formData);
+      if (!res || res.error) {
+        setTeamProfiles(prevTeam);
+        setSelectedColor(prevColor);
+        setProfileState({
+          error: res?.error ?? "Profil güncellenemedi, değişiklik geri alındı.",
+        });
+        return;
+      }
+      setProfileState(res);
+    } catch {
+      setTeamProfiles(prevTeam);
+      setSelectedColor(prevColor);
+      setProfileState({
+        error: "Bağlantı hatası: Profil değişikliği geri alındı.",
+      });
+    }
+  }
+
+  async function handleWorkspaceSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const studioName = String(formData.get("studioName") ?? "").trim();
+    const projectName = String(formData.get("projectName") ?? "").trim();
+    const ueVersion = String(formData.get("ueVersion") ?? "").trim();
+    const discordWebhookUrl = String(
+      formData.get("discordWebhookUrl") ?? ""
+    ).trim();
+
+    const prevWorkspace: WorkspaceSettings = workspace;
+
+    // 0 ms Optimistic UI
+    setWorkspace({
+      ...workspace,
+      studio_name: studioName || workspace.studio_name,
+      project_name: projectName || workspace.project_name,
+      ue_version: ueVersion || workspace.ue_version,
+      discord_webhook_url: discordWebhookUrl || null,
+      updated_at: new Date().toISOString(),
+    });
+    setWorkspaceState({ success: "Proje ve stüdyo ayarları kaydedildi." });
+
+    try {
+      const res = await updateWorkspaceSettingsAction(null, formData);
+      if (!res || res.error) {
+        setWorkspace(prevWorkspace);
+        setWorkspaceState({
+          error:
+            res?.error ?? "Proje ayarları kaydedilemedi, değişiklik geri alındı.",
+        });
+        return;
+      }
+      setWorkspaceState(res);
+    } catch {
+      setWorkspace(prevWorkspace);
+      setWorkspaceState({
+        error: "Bağlantı hatası: Stüdyo ayarları değişikliği geri alındı.",
+      });
+    }
+  }
 
   async function handleTestDiscord() {
     setTestingDiscord(true);
@@ -81,7 +171,7 @@ export function SettingsForms({
           </div>
         )}
 
-        <form action={profileAction} className="space-y-4">
+        <form onSubmit={handleProfileSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <label
               htmlFor="displayName"
@@ -148,10 +238,10 @@ export function SettingsForms({
 
           <button
             type="submit"
-            disabled={profilePending || !isConfigured || !currentProfile}
+            disabled={!isConfigured || !currentProfile}
             className="rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {profilePending ? "Kaydediliyor..." : "Profili Kaydet"}
+            Profili Kaydet
           </button>
         </form>
       </section>
@@ -185,7 +275,7 @@ export function SettingsForms({
           </div>
         )}
 
-        <form action={workspaceAction} className="space-y-4">
+        <form onSubmit={handleWorkspaceSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <label
               htmlFor="studioName"
@@ -275,10 +365,10 @@ export function SettingsForms({
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               type="submit"
-              disabled={workspacePending || !isConfigured || !currentProfile}
+              disabled={!isConfigured || !currentProfile}
               className="rounded-lg bg-cyan-500 px-4 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {workspacePending ? "Kaydediliyor..." : "Proje Ayarlarını Kaydet"}
+              Proje Ayarlarını Kaydet
             </button>
 
             <button

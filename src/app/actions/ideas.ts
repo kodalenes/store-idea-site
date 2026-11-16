@@ -3,7 +3,7 @@
 import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { sendDiscordNotification } from "@/lib/discord";
+import { queueDiscordNotification } from "@/lib/discord";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { IdeaCategory, IdeaStatus, TaskPriority } from "@/types/studio";
 
@@ -66,12 +66,12 @@ async function requireAuthSupabase() {
     return { supabase: null, user: null, error: "Supabase yapılandırılmamış." };
   }
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user) {
     return { supabase: null, user: null, error: "Oturum bulunamadı." };
   }
-  return { supabase, user, error: null };
+  return { supabase, user: session.user, error: null };
 }
 
 export async function createIdeaAction(input: {
@@ -81,7 +81,7 @@ export async function createIdeaAction(input: {
   category: IdeaCategory;
   status: IdeaStatus;
   reference_links: { label: string; url: string }[];
-}): Promise<ActionResult<{ id: string }>> {
+}): Promise<ActionResult<{ id: string; created_at: string }>> {
   const parsed = ideaPayloadSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -106,7 +106,7 @@ export async function createIdeaAction(input: {
       reference_links: parsed.data.reference_links,
       created_by: user.id,
     })
-    .select("id")
+    .select("id, created_at")
     .single();
 
   if (error || !data) {
@@ -116,7 +116,7 @@ export async function createIdeaAction(input: {
     };
   }
 
-  await sendDiscordNotification({
+  queueDiscordNotification({
     title: `💡 Yeni Fikir: ${parsed.data.title}`,
     description: parsed.data.summary || undefined,
     color: 0xf59e0b,
@@ -127,7 +127,7 @@ export async function createIdeaAction(input: {
   });
 
   revalidateIdeasCache(data.id);
-  return { ok: true, data: { id: data.id } };
+  return { ok: true, data: { id: data.id, created_at: data.created_at } };
 }
 
 export async function updateIdeaAction(
@@ -196,7 +196,7 @@ export async function updateIdeaStatusAction(
   }
 
   if (status === "approved" && updatedIdea) {
-    await sendDiscordNotification({
+    queueDiscordNotification({
       title: `✨ Fikir Onaylandı: ${updatedIdea.title}`,
       description: "Ekip bu fikri oyuna eklemek üzere onayladı!",
       color: 0x10b981,
@@ -411,7 +411,7 @@ export async function convertIdeaToTaskAction(input: {
     };
   }
 
-  await sendDiscordNotification({
+  queueDiscordNotification({
     title: `🚀 Fikirden Göreve Dönüştürüldü: ${parsed.data.title}`,
     color: 0x06b6d4,
     fields: [

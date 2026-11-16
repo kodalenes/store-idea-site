@@ -1,5 +1,4 @@
 import type {
-  AssetLockType,
   BugSeverity,
   IdeaCategory,
   IdeaStatus,
@@ -140,15 +139,6 @@ export const BUG_SEVERITIES: { value: BugSeverity; label: string }[] = [
   { value: "visual", label: "Görsel / Shader" },
   { value: "audio", label: "Ses Hatası" },
   { value: "minor", label: "Küçük Kusur" },
-];
-
-export const ASSET_LOCK_TYPES: { value: AssetLockType; label: string }[] = [
-  { value: "level", label: "Level (.umap)" },
-  { value: "blueprint", label: "Blueprint (.uasset)" },
-  { value: "mesh", label: "3D Mesh / Rig" },
-  { value: "animation", label: "Animasyon" },
-  { value: "material", label: "Material / Niagara" },
-  { value: "other", label: "Diğer Asset" },
 ];
 
 export const AVATAR_COLORS = [

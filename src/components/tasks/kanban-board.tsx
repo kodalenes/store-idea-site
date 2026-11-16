@@ -1,13 +1,12 @@
 "use client";
 
 import {
-  startTransition,
+  useEffect,
   useMemo,
-  useOptimistic,
+  useRef,
   useState,
 } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
 import {
   Plus,
   Search,
@@ -18,15 +17,17 @@ import {
   Lightbulb,
   Bug,
   Flag,
+  RotateCcw,
 } from "lucide-react";
 import {
   TASK_PRIORITIES,
   TASK_STATUSES,
   UE_DISCIPLINE_TAGS,
 } from "@/lib/constants";
-import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
+import { useStudioStore } from "@/components/studio/studio-store";
 import {
   createTaskAction,
+  deleteTaskAction,
   moveTaskStatusAction,
   updateTaskAction,
 } from "@/app/actions/tasks";
@@ -47,55 +48,98 @@ const TaskDetailDrawer = dynamic(
     ),
   { ssr: false }
 );
-import type {
-  Idea,
-  Milestone,
-  Profile,
-  TaskBoardItem,
-  TaskStatus,
-} from "@/types/studio";
+import type { TaskBoardItem, TaskStatus } from "@/types/studio";
 
-export function KanbanBoard({
-  initialTasks,
-  teamProfiles,
-  milestones,
-  ideas,
-  currentUserId,
-  isConfigured,
-  initialMilestoneFilter = "all",
-}: {
-  initialTasks: TaskBoardItem[];
-  teamProfiles: Profile[];
-  milestones: Milestone[];
-  ideas: Pick<Idea, "id" | "title">[];
-  currentUserId: string | null;
-  isConfigured: boolean;
-  initialMilestoneFilter?: string;
-}) {
-  const router = useRouter();
-
-  const [optimisticTasks, moveTaskOptimistic] = useOptimistic(
-    initialTasks,
-    (state, update: { taskId: string; status: TaskStatus }) =>
-      state.map((t) =>
-        t.id === update.taskId ? { ...t, status: update.status } : t
-      )
-  );
+export function KanbanBoard() {
+  const {
+    tasks,
+    setTasks,
+    teamProfiles,
+    milestones,
+    ideas,
+    currentUserId,
+    currentProfile,
+    isConfigured,
+    tasksMilestoneFilter,
+    setTasksMilestoneFilter,
+  } = useStudioStore();
 
   // Filters
   const [search, setSearch] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
-  const [milestoneFilter, setMilestoneFilter] = useState<string>(
-    initialMilestoneFilter
-  );
+  const milestoneFilter = tasksMilestoneFilter;
+  const setMilestoneFilter = setTasksMilestoneFilter;
   const [kindFilter, setKindFilter] = useState<"all" | "task" | "bug">("all");
 
-  // Drag state & Mobile active column
+  // Drag state, Horizontal Pan & Mobile active column
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
   const [mobileActiveColumn, setMobileActiveColumn] =
     useState<TaskStatus>("todo");
+
+  const boardScrollRef = useRef<HTMLDivElement | null>(null);
+  const panStateRef = useRef<{
+    startX: number;
+    startScrollLeft: number;
+  } | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
+
+  useEffect(() => {
+    if (!isPanning) return;
+
+    function handleWindowMouseMove(e: MouseEvent) {
+      const state = panStateRef.current;
+      const el = boardScrollRef.current;
+      if (!state || !el) return;
+      el.scrollLeft = state.startScrollLeft - (e.clientX - state.startX);
+    }
+
+    function handleWindowMouseUp() {
+      panStateRef.current = null;
+      setIsPanning(false);
+    }
+
+    window.addEventListener("mousemove", handleWindowMouseMove);
+    window.addEventListener("mouseup", handleWindowMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mouseup", handleWindowMouseUp);
+    };
+  }, [isPanning]);
+
+  function handleBoardMouseDown(e: React.MouseEvent<HTMLDivElement>) {
+    if (e.button !== 0 || !boardScrollRef.current) return;
+    const target = e.target as HTMLElement | null;
+    if (
+      target?.closest(
+        "[data-kanban-card], button, select, input, textarea, a, label"
+      )
+    ) {
+      return;
+    }
+
+    panStateRef.current = {
+      startX: e.clientX,
+      startScrollLeft: boardScrollRef.current.scrollLeft,
+    };
+    setIsPanning(true);
+  }
+
+  const hasActiveFilters =
+    search.trim().length > 0 ||
+    assigneeFilter !== "all" ||
+    tagFilter !== "all" ||
+    milestoneFilter !== "all" ||
+    kindFilter !== "all";
+
+  function resetFilters() {
+    setSearch("");
+    setAssigneeFilter("all");
+    setTagFilter("all");
+    setTasksMilestoneFilter("all");
+    setKindFilter("all");
+  }
 
   // Modals & Drawer
   const [createStatus, setCreateStatus] = useState<TaskStatus | null>(null);
@@ -103,14 +147,9 @@ export function KanbanBoard({
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [boardError, setBoardError] = useState<string | null>(null);
 
-  useRealtimeRefresh("kanban-live", [
-    { table: "tasks" },
-    { table: "subtasks" },
-  ]);
-
   const filteredTasks = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return optimisticTasks.filter((t) => {
+    return tasks.filter((t) => {
       if (kindFilter !== "all" && t.kind !== kindFilter) return false;
       if (assigneeFilter === "mine" && t.assignee_id !== currentUserId) {
         return false;
@@ -137,7 +176,7 @@ export function KanbanBoard({
       return true;
     });
   }, [
-    optimisticTasks,
+    tasks,
     search,
     assigneeFilter,
     tagFilter,
@@ -147,30 +186,40 @@ export function KanbanBoard({
   ]);
 
   const selectedTask = useMemo(
-    () => optimisticTasks.find((t) => t.id === selectedTaskId) ?? null,
-    [optimisticTasks, selectedTaskId]
+    () => tasks.find((t) => t.id === selectedTaskId) ?? null,
+    [tasks, selectedTaskId]
   );
 
-  function handleMoveStatus(taskId: string, targetStatus: TaskStatus) {
-    const task = optimisticTasks.find((t) => t.id === taskId);
-    if (!task || task.status === targetStatus) return;
+  async function handleMoveStatus(taskId: string, targetStatus: TaskStatus) {
+    const prevTask = tasks.find((t) => t.id === taskId);
+    if (!prevTask || prevTask.status === targetStatus) return;
 
+    const prevStatus = prevTask.status;
     setBoardError(null);
-    startTransition(async () => {
-      moveTaskOptimistic({ taskId, status: targetStatus });
-      try {
-        const res = await moveTaskStatusAction(taskId, targetStatus);
-        if (!res.ok) {
-          setBoardError(
-            res.error ?? "Kart taşınamadı, eski sütununa geri alındı."
-          );
-          return;
-        }
-        router.refresh();
-      } catch {
-        setBoardError("Bağlantı hatası: Kart taşıma işlemi geri alındı.");
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? { ...t, status: targetStatus, updated_at: new Date().toISOString() }
+          : t
+      )
+    );
+
+    try {
+      const res = await moveTaskStatusAction(taskId, targetStatus);
+      if (!res.ok) {
+        setTasks((prev) =>
+          prev.map((t) => (t.id === taskId ? { ...t, status: prevStatus } : t))
+        );
+        setBoardError(
+          res.error ?? "Kart taşınamadı, eski sütununa geri alındı."
+        );
       }
-    });
+    } catch {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, status: prevStatus } : t))
+      );
+      setBoardError("Bağlantı hatası: Kart taşıma işlemi geri alındı.");
+    }
   }
 
   function handleDropOnColumn(targetStatus: TaskStatus) {
@@ -178,20 +227,177 @@ export function KanbanBoard({
     if (!draggedTaskId) return;
     const id = draggedTaskId;
     setDraggedTaskId(null);
-    handleMoveStatus(id, targetStatus);
+    void handleMoveStatus(id, targetStatus);
   }
 
   async function handleCreateSubmit(values: TaskFormValues) {
-    const res = await createTaskAction(values);
-    if (res.ok) router.refresh();
-    return res;
+    setBoardError(null);
+    const tempId = `temp-task-${Date.now()}`;
+    const nowIso = new Date().toISOString();
+
+    const assignee = values.assignee_id
+      ? teamProfiles.find((p) => p.id === values.assignee_id) ?? null
+      : null;
+    const ms = values.milestone_id
+      ? milestones.find((m) => m.id === values.milestone_id) ?? null
+      : null;
+    const srcIdea = values.source_idea_id
+      ? ideas.find((i) => i.id === values.source_idea_id) ?? null
+      : null;
+    const blocker = values.blocked_by_task_id
+      ? tasks.find((t) => t.id === values.blocked_by_task_id) ?? null
+      : null;
+
+    const optimisticTask: TaskBoardItem = {
+      id: tempId,
+      title: values.title,
+      description_md: values.description_md,
+      kind: "task",
+      status: values.status,
+      priority: values.priority,
+      ue_tags: values.ue_tags,
+      assignee_id: values.assignee_id,
+      reporter_id: currentUserId,
+      milestone_id: values.milestone_id,
+      source_idea_id: values.source_idea_id,
+      blocked_by_task_id: values.blocked_by_task_id,
+      bug_severity: null,
+      repro_steps: "",
+      build_version: "",
+      position: 0,
+      created_at: nowIso,
+      updated_at: nowIso,
+      assignee,
+      reporter: currentProfile,
+      milestone: ms ? { id: ms.id, title: ms.title } : null,
+      source_idea: srcIdea ? { id: srcIdea.id, title: srcIdea.title } : null,
+      blocked_by_task: blocker
+        ? { id: blocker.id, title: blocker.title, status: blocker.status }
+        : null,
+      subtasks: [],
+      comment_count: 0,
+      attachment_count: 0,
+    };
+
+    setTasks((prev) => [optimisticTask, ...prev]);
+
+    try {
+      const res = await createTaskAction(values);
+      if (!res.ok || !res.data) {
+        setTasks((prev) => prev.filter((t) => t.id !== tempId));
+        setBoardError(
+          res.error ?? "Görev veritabanına kaydedilemedi, geri alındı."
+        );
+        return { ok: false, error: res.error };
+      }
+
+      const realId = res.data.id;
+      const realCreatedAt = res.data.created_at;
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === tempId
+            ? { ...t, id: realId, created_at: realCreatedAt }
+            : t
+        )
+      );
+      setSelectedTaskId((cur) => (cur === tempId ? realId : cur));
+      return { ok: true };
+    } catch {
+      setTasks((prev) => prev.filter((t) => t.id !== tempId));
+      setBoardError("Bağlantı hatası: Görev oluşturulamadı, geri alındı.");
+      return { ok: false, error: "Bağlantı hatası." };
+    }
   }
 
   async function handleEditSubmit(values: TaskFormValues) {
     if (!editingTask) return { ok: false, error: "Görev bulunamadı." };
-    const res = await updateTaskAction(editingTask.id, values);
-    if (res.ok) router.refresh();
-    return res;
+    const targetId = editingTask.id;
+    const prevSnapshot = tasks.find((t) => t.id === targetId);
+    if (!prevSnapshot) return { ok: false, error: "Görev bulunamadı." };
+
+    setBoardError(null);
+    const assignee = values.assignee_id
+      ? teamProfiles.find((p) => p.id === values.assignee_id) ?? null
+      : null;
+    const ms = values.milestone_id
+      ? milestones.find((m) => m.id === values.milestone_id) ?? null
+      : null;
+    const srcIdea = values.source_idea_id
+      ? ideas.find((i) => i.id === values.source_idea_id) ?? null
+      : null;
+    const blocker = values.blocked_by_task_id
+      ? tasks.find((t) => t.id === values.blocked_by_task_id) ?? null
+      : null;
+
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === targetId
+          ? {
+              ...t,
+              title: values.title,
+              description_md: values.description_md,
+              status: values.status,
+              priority: values.priority,
+              ue_tags: values.ue_tags,
+              assignee_id: values.assignee_id,
+              milestone_id: values.milestone_id,
+              source_idea_id: values.source_idea_id,
+              blocked_by_task_id: values.blocked_by_task_id,
+              assignee,
+              milestone: ms ? { id: ms.id, title: ms.title } : null,
+              source_idea: srcIdea
+                ? { id: srcIdea.id, title: srcIdea.title }
+                : null,
+              blocked_by_task: blocker
+                ? {
+                    id: blocker.id,
+                    title: blocker.title,
+                    status: blocker.status,
+                  }
+                : null,
+              updated_at: new Date().toISOString(),
+            }
+          : t
+      )
+    );
+
+    try {
+      const res = await updateTaskAction(targetId, values);
+      if (!res.ok) {
+        setTasks((prev) =>
+          prev.map((t) => (t.id === targetId ? prevSnapshot : t))
+        );
+        setBoardError(
+          res.error ?? "Görev güncellenemedi, değişiklik geri alındı."
+        );
+        return { ok: false, error: res.error };
+      }
+      return { ok: true };
+    } catch {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === targetId ? prevSnapshot : t))
+      );
+      setBoardError("Bağlantı hatası: Görev güncellemesi geri alındı.");
+      return { ok: false, error: "Bağlantı hatası." };
+    }
+  }
+
+  async function handleDeleteTaskOptimistic(taskId: string) {
+    const prevSnapshot = tasks.find((t) => t.id === taskId);
+    if (!prevSnapshot) return;
+    setBoardError(null);
+    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+
+    try {
+      const res = await deleteTaskAction(taskId);
+      if (!res.ok) {
+        setTasks((prev) => [prevSnapshot, ...prev]);
+        setBoardError(res.error ?? "Görev silinemedi, geri yüklendi.");
+      }
+    } catch {
+      setTasks((prev) => [prevSnapshot, ...prev]);
+      setBoardError("Bağlantı hatası: Görev silme işlemi geri alındı.");
+    }
   }
 
   return (
@@ -232,23 +438,50 @@ export function KanbanBoard({
         </div>
       )}
 
-      {/* Filters Bar */}
-      <div className="grid gap-3 rounded-xl border border-[#1f2735] bg-[#10141d] p-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="relative lg:col-span-2">
-          <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+      {/* Compact Toolbar */}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#1f2735] bg-[#10141d] p-3">
+        {currentUserId && (
+          <div className="inline-flex rounded-lg border border-[#242e40] bg-[#080a0f] p-0.5 text-xs">
+            <button
+              type="button"
+              onClick={() => setAssigneeFilter("all")}
+              className={`rounded-md px-2.5 py-1.5 font-medium transition ${
+                assigneeFilter !== "mine"
+                  ? "bg-[#1a2232] text-zinc-100"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Tüm İşler
+            </button>
+            <button
+              type="button"
+              onClick={() => setAssigneeFilter("mine")}
+              className={`rounded-md px-2.5 py-1.5 font-medium transition ${
+                assigneeFilter === "mine"
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Bana Atananlar
+            </button>
+          </div>
+        )}
+
+        <div className="relative min-w-44 flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Görev, tag veya sistem ara..."
-            className="w-full rounded-lg border border-[#242e40] bg-[#080a0f] py-2 pr-3 pl-9 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-amber-500/60 focus:outline-none"
+            placeholder="Görev veya tag ara..."
+            className="w-full rounded-lg border border-[#242e40] bg-[#080a0f] py-1.5 pr-3 pl-8.5 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-amber-500/60 focus:outline-none"
           />
         </div>
 
         <select
           value={assigneeFilter}
           onChange={(e) => setAssigneeFilter(e.target.value)}
-          className="rounded-lg border border-[#242e40] bg-[#080a0f] px-3 py-2 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
+          className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
         >
           <option value="all">Kişi: Tümü</option>
           {currentUserId && <option value="mine">Bana Atananlar</option>}
@@ -263,9 +496,9 @@ export function KanbanBoard({
         <select
           value={tagFilter}
           onChange={(e) => setTagFilter(e.target.value)}
-          className="rounded-lg border border-[#242e40] bg-[#080a0f] px-3 py-2 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
+          className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
         >
-          <option value="all">UE5 Etiketi: Tümü</option>
+          <option value="all">Etiket: Tümü</option>
           {UE_DISCIPLINE_TAGS.map((tag) => (
             <option key={tag} value={tag}>
               {tag}
@@ -273,32 +506,41 @@ export function KanbanBoard({
           ))}
         </select>
 
-        <div className="flex gap-2">
-          <select
-            value={milestoneFilter}
-            onChange={(e) => setMilestoneFilter(e.target.value)}
-            className="min-w-0 flex-1 rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-2 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
-          >
-            <option value="all">Milestone: Tümü</option>
-            {milestones.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.title}
-              </option>
-            ))}
-          </select>
+        <select
+          value={milestoneFilter}
+          onChange={(e) => setMilestoneFilter(e.target.value)}
+          className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
+        >
+          <option value="all">Milestone: Tümü</option>
+          {milestones.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.title}
+            </option>
+          ))}
+        </select>
 
-          <select
-            value={kindFilter}
-            onChange={(e) =>
-              setKindFilter(e.target.value as "all" | "task" | "bug")
-            }
-            className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-2 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
+        <select
+          value={kindFilter}
+          onChange={(e) =>
+            setKindFilter(e.target.value as "all" | "task" | "bug")
+          }
+          className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
+        >
+          <option value="all">Tür: Hepsi</option>
+          <option value="task">Görev</option>
+          <option value="bug">Bug</option>
+        </select>
+
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="inline-flex items-center gap-1 rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-300 hover:border-amber-500/40 hover:text-amber-300"
           >
-            <option value="all">Hepsi</option>
-            <option value="task">Görev</option>
-            <option value="bug">Bug</option>
-          </select>
-        </div>
+            <RotateCcw className="h-3 w-3" />
+            Sıfırla
+          </button>
+        )}
       </div>
 
       {/* Mobile Column Switcher Tabs */}
@@ -323,8 +565,14 @@ export function KanbanBoard({
         })}
       </div>
 
-      {/* Kanban Columns */}
-      <div className="flex flex-col gap-4 pb-4 md:flex-row md:overflow-x-auto">
+      {/* Kanban Columns (bounded height + internal vertical scroll + left-click horizontal pan) */}
+      <div
+        ref={boardScrollRef}
+        onMouseDown={handleBoardMouseDown}
+        className={`flex flex-col gap-4 pb-2 md:h-[calc(100dvh-210px)] md:min-h-[480px] md:flex-row md:overflow-x-auto md:overflow-y-hidden ${
+          isPanning ? "md:cursor-grabbing select-none" : "md:cursor-grab"
+        }`}
+      >
         {TASK_STATUSES.map((column) => {
           const columnTasks = filteredTasks.filter(
             (t) => t.status === column.value
@@ -352,14 +600,14 @@ export function KanbanBoard({
               }}
               className={`${
                 isMobileActive ? "flex" : "hidden md:flex"
-              } min-h-[340px] w-full flex-col rounded-xl border bg-[#0c1018] transition md:min-h-[460px] md:w-72 md:shrink-0 ${
+              } min-h-[340px] w-full flex-col overflow-hidden rounded-xl border bg-[#0c1018] transition md:h-full md:w-76 md:shrink-0 ${
                 isDropTarget
                   ? "border-amber-400/70 bg-amber-500/5"
                   : `border-[#1f2735] border-t-2 ${column.accentClass}`
               }`}
             >
               {/* Column Header */}
-              <div className="flex items-center justify-between border-b border-[#1a2130] px-3.5 py-3">
+              <div className="flex shrink-0 items-center justify-between border-b border-[#1a2130] px-3.5 py-3">
                 <div className="flex items-center gap-2">
                   <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-200">
                     {column.label}
@@ -379,8 +627,8 @@ export function KanbanBoard({
                 </button>
               </div>
 
-              {/* Column Cards */}
-              <div className="flex-1 space-y-2.5 p-3">
+              {/* Column Cards (vertical wheel scroll inside column) */}
+              <div className="flex-1 space-y-2.5 overflow-y-auto overscroll-contain p-3">
                 {columnTasks.length === 0 ? (
                   <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-[#1e2636] text-[11px] text-zinc-600">
                     Kart yok
@@ -400,6 +648,7 @@ export function KanbanBoard({
                     return (
                       <div
                         key={task.id}
+                        data-kanban-card="true"
                         draggable
                         onDragStart={() => setDraggedTaskId(task.id)}
                         onDragEnd={() => {
@@ -569,7 +818,7 @@ export function KanbanBoard({
           teamProfiles={teamProfiles}
           milestones={milestones}
           ideas={ideas}
-          allTasks={optimisticTasks}
+          allTasks={tasks}
           onClose={() => setCreateStatus(null)}
           onSubmit={handleCreateSubmit}
         />
@@ -595,7 +844,7 @@ export function KanbanBoard({
           teamProfiles={teamProfiles}
           milestones={milestones}
           ideas={ideas}
-          allTasks={optimisticTasks}
+          allTasks={tasks}
           onClose={() => setEditingTask(null)}
           onSubmit={handleEditSubmit}
         />
@@ -605,17 +854,15 @@ export function KanbanBoard({
       <TaskDetailDrawer
         task={selectedTask}
         currentUserId={currentUserId}
-        currentProfile={
-          teamProfiles.find((p) => p.id === currentUserId) ?? null
-        }
+        currentProfile={currentProfile}
         onClose={() => setSelectedTaskId(null)}
-        onEdit={(task) => setEditingTask(task)}
-        onSelectTask={(id) => setSelectedTaskId(id)}
-        onStatusChangeOptimistic={(taskId, status) => {
-          startTransition(() => {
-            moveTaskOptimistic({ taskId, status });
-          });
+        onEdit={(task) => {
+          setSelectedTaskId(null);
+          setEditingTask(task);
         }}
+        onSelectTask={(id) => setSelectedTaskId(id)}
+        onStatusChangeOptimistic={handleMoveStatus}
+        onDeleteTask={handleDeleteTaskOptimistic}
       />
     </div>
   );

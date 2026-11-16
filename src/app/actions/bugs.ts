@@ -2,7 +2,7 @@
 
 import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
-import { sendDiscordNotification } from "@/lib/discord";
+import { queueDiscordNotification } from "@/lib/discord";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { BugSeverity, TaskPriority } from "@/types/studio";
 
@@ -38,7 +38,7 @@ export async function createBugAction(input: {
   ue_tags: string[];
   assignee_id: string | null;
   milestone_id: string | null;
-}): Promise<BugActionResult<{ id: string }>> {
+}): Promise<BugActionResult<{ id: string; created_at: string }>> {
   const parsed = createBugSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -53,8 +53,9 @@ export async function createBugAction(input: {
   }
 
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
   if (!user) {
     return { ok: false, error: "Oturum bulunamadı." };
   }
@@ -75,14 +76,14 @@ export async function createBugAction(input: {
       repro_steps: parsed.data.repro_steps,
       build_version: parsed.data.build_version,
     })
-    .select("id")
+    .select("id, created_at")
     .single();
 
   if (error || !data) {
     return { ok: false, error: error?.message ?? "Bug raporu oluşturulamadı." };
   }
 
-  await sendDiscordNotification({
+  queueDiscordNotification({
     title: `🐞 Yeni Bug: ${parsed.data.title}`,
     description: parsed.data.repro_steps
       ? parsed.data.repro_steps.slice(0, 300)
@@ -110,5 +111,5 @@ export async function createBugAction(input: {
   revalidatePath("/tasks");
   revalidatePath("/milestones");
   revalidatePath("/");
-  return { ok: true, data: { id: data.id } };
+  return { ok: true, data: { id: data.id, created_at: data.created_at } };
 }

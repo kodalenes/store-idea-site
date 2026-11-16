@@ -44,6 +44,7 @@ import {
 } from "@/app/actions/ideas";
 import type { IdeaFormValues } from "@/components/ideas/idea-form-modal";
 import { MarkdownViewer } from "@/components/ideas/markdown-viewer";
+import { useStudioStore } from "@/components/studio/studio-store";
 
 const IdeaFormModal = dynamic(
   () =>
@@ -73,6 +74,7 @@ export function IdeaDetailView({
   milestones: Milestone[];
 }) {
   const router = useRouter();
+  const { setIdeas, setTasks, currentProfile } = useStudioStore();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [idea, applyOptimisticIdea] = useOptimistic(
@@ -139,9 +141,22 @@ export function IdeaDetailView({
     IDEA_CATEGORIES[0];
 
   async function handleOptimisticVote() {
+    const nextVoted = !idea.has_voted;
+    const delta = nextVoted ? 1 : -1;
     startTransition(() => {
       applyOptimisticIdea({ type: "vote" });
     });
+    setIdeas((prev) =>
+      prev.map((item) =>
+        item.id === idea.id
+          ? {
+              ...item,
+              has_voted: nextVoted,
+              vote_count: Math.max(0, item.vote_count + delta),
+            }
+          : item
+      )
+    );
     await toggleIdeaVoteAction(idea.id);
     router.refresh();
   }
@@ -150,15 +165,36 @@ export function IdeaDetailView({
     startTransition(() => {
       applyOptimisticIdea({ type: "status", status: nextStatus });
     });
+    setIdeas((prev) =>
+      prev.map((item) =>
+        item.id === idea.id
+          ? { ...item, status: nextStatus, updated_at: new Date().toISOString() }
+          : item
+      )
+    );
     await updateIdeaStatusAction(idea.id, nextStatus);
     router.refresh();
   }
 
   async function handleEditSubmit(values: IdeaFormValues) {
+    setIdeas((prev) =>
+      prev.map((item) =>
+        item.id === idea.id
+          ? {
+              ...item,
+              title: values.title.trim() || item.title,
+              summary: values.summary.trim(),
+              content_md: values.content_md,
+              category: values.category,
+              status: values.status,
+              reference_links: values.reference_links,
+              updated_at: new Date().toISOString(),
+            }
+          : item
+      )
+    );
     const res = await updateIdeaAction(idea.id, values);
-    if (res.ok) {
-      router.refresh();
-    }
+    router.refresh();
     return res;
   }
 
@@ -217,7 +253,7 @@ export function IdeaDetailView({
     setConvertError(null);
     setConverting(true);
 
-    const res = await convertIdeaToTaskAction({
+    const payload = {
       ideaId: idea.id,
       title: taskTitle,
       description_md: taskDesc,
@@ -225,13 +261,66 @@ export function IdeaDetailView({
       ue_tags: taskTags,
       assignee_id: taskAssignee || null,
       milestone_id: taskMilestone || null,
-    });
+    };
+
+    const res = await convertIdeaToTaskAction(payload);
 
     setConverting(false);
     if (!res.ok) {
       setConvertError(res.error ?? "Görev oluşturulamadı.");
       return;
     }
+
+    const now = new Date().toISOString();
+    const assignee = payload.assignee_id
+      ? teamProfiles.find((p) => p.id === payload.assignee_id) ?? null
+      : null;
+    const milestone = payload.milestone_id
+      ? milestones.find((m) => m.id === payload.milestone_id) ?? null
+      : null;
+    setTasks((prev) => [
+      {
+        id: `temp-conv-${Date.now()}`,
+        title: payload.title.trim() || idea.title,
+        description_md: payload.description_md,
+        kind: "task",
+        status: "backlog",
+        priority: payload.priority,
+        ue_tags: payload.ue_tags,
+        assignee_id: payload.assignee_id,
+        reporter_id: currentUserId,
+        milestone_id: payload.milestone_id,
+        source_idea_id: idea.id,
+        blocked_by_task_id: null,
+        bug_severity: null,
+        repro_steps: "",
+        build_version: "",
+        position: Date.now(),
+        created_at: now,
+        updated_at: now,
+        assignee,
+        reporter:
+          currentProfile ??
+          teamProfiles.find((p) => p.id === currentUserId) ??
+          null,
+        milestone: milestone
+          ? { id: milestone.id, title: milestone.title }
+          : null,
+        source_idea: { id: idea.id, title: idea.title },
+        blocked_by_task: null,
+        subtasks: [],
+        comment_count: 0,
+        attachment_count: 0,
+      },
+      ...prev,
+    ]);
+    setIdeas((prev) =>
+      prev.map((item) =>
+        item.id === idea.id
+          ? { ...item, linked_task_count: item.linked_task_count + 1 }
+          : item
+      )
+    );
 
     setConvertOpen(false);
     setConvertSuccess(
@@ -286,6 +375,7 @@ export function IdeaDetailView({
 
           <form
             action={async () => {
+              setIdeas((prev) => prev.filter((item) => item.id !== idea.id));
               await deleteIdeaAction(idea.id);
             }}
             onSubmit={(e) => {

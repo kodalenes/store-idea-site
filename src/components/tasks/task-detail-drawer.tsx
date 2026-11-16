@@ -1,10 +1,10 @@
 "use client";
 
-import { startTransition, useEffect, useOptimistic, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useStudioStore } from "@/components/studio/studio-store";
 import {
   X,
   Edit3,
@@ -33,7 +33,6 @@ import {
   deleteTaskAction,
   deleteTaskAttachmentAction,
   deleteTaskCommentAction,
-  moveTaskStatusAction,
   registerTaskAttachmentAction,
   toggleSubtaskAction,
 } from "@/app/actions/tasks";
@@ -71,11 +70,6 @@ import type {
   TaskStatus,
 } from "@/types/studio";
 
-type SubtaskOptimisticAction =
-  | { type: "toggle"; id: string; is_done: boolean }
-  | { type: "add"; subtask: Subtask }
-  | { type: "delete"; id: string };
-
 export function TaskDetailDrawer({
   task,
   currentUserId,
@@ -84,6 +78,7 @@ export function TaskDetailDrawer({
   onEdit,
   onSelectTask,
   onStatusChangeOptimistic,
+  onDeleteTask,
 }: {
   task: TaskBoardItem | null;
   currentUserId: string | null;
@@ -92,25 +87,12 @@ export function TaskDetailDrawer({
   onEdit: (task: TaskBoardItem) => void;
   onSelectTask: (taskId: string) => void;
   onStatusChangeOptimistic: (taskId: string, status: TaskStatus) => void;
+  onDeleteTask?: (taskId: string) => void;
 }) {
-  const router = useRouter();
+  const { setTasks } = useStudioStore();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [newSubtask, setNewSubtask] = useState("");
-  const [optimisticSubtasks, applyOptimisticSubtask] = useOptimistic(
-    task?.subtasks ?? [],
-    (state: Subtask[], action: SubtaskOptimisticAction) => {
-      if (action.type === "toggle") {
-        return state.map((s) =>
-          s.id === action.id ? { ...s, is_done: action.is_done } : s
-        );
-      }
-      if (action.type === "add") {
-        return [...state, action.subtask];
-      }
-      return state.filter((s) => s.id !== action.id);
-    }
-  );
 
   const [extrasState, setExtrasState] = useState<{
     taskId: string;
@@ -191,8 +173,9 @@ export function TaskDetailDrawer({
 
   if (!task) return null;
 
-  const doneCount = optimisticSubtasks.filter((s) => s.is_done).length;
-  const totalSubtasks = optimisticSubtasks.length;
+  const subtasks = task.subtasks;
+  const doneCount = subtasks.filter((s) => s.is_done).length;
+  const totalSubtasks = subtasks.length;
   const subtaskPct =
     totalSubtasks > 0 ? Math.round((doneCount / totalSubtasks) * 100) : 0;
 
@@ -210,92 +193,188 @@ export function TaskDetailDrawer({
     setActionError(null);
     setNewSubtask("");
 
+    const targetTaskId = task.id;
+    const tempId = `temp-sub-${Date.now()}`;
     const tempSubtask: Subtask = {
-      id: `temp-${Date.now()}`,
-      task_id: task.id,
+      id: tempId,
+      task_id: targetTaskId,
       title,
       is_done: false,
-      position: optimisticSubtasks.length,
+      position: subtasks.length,
       created_at: new Date().toISOString(),
     };
 
-    startTransition(async () => {
-      applyOptimisticSubtask({ type: "add", subtask: tempSubtask });
-      try {
-        const res = await addSubtaskAction(task.id, title);
-        if (!res.ok) {
-          setNewSubtask(title);
-          setActionError(
-            res.error ?? "Alt görev kaydedilemedi, değişiklik geri alındı."
-          );
-          return;
-        }
-        router.refresh();
-      } catch {
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === targetTaskId
+          ? { ...t, subtasks: [...t.subtasks, tempSubtask] }
+          : t
+      )
+    );
+
+    try {
+      const res = await addSubtaskAction(targetTaskId, title);
+      if (!res.ok || !res.data) {
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === targetTaskId
+              ? { ...t, subtasks: t.subtasks.filter((s) => s.id !== tempId) }
+              : t
+          )
+        );
         setNewSubtask(title);
-        setActionError("Bağlantı hatası: Alt görev kaydedilemedi, geri alındı.");
+        setActionError(
+          res.error ?? "Alt görev kaydedilemedi, değişiklik geri alındı."
+        );
+        return;
       }
-    });
+      const realId = res.data.id;
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === targetTaskId
+            ? {
+                ...t,
+                subtasks: t.subtasks.map((s) =>
+                  s.id === tempId ? { ...s, id: realId } : s
+                ),
+              }
+            : t
+        )
+      );
+    } catch {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === targetTaskId
+            ? { ...t, subtasks: t.subtasks.filter((s) => s.id !== tempId) }
+            : t
+        )
+      );
+      setNewSubtask(title);
+      setActionError("Bağlantı hatası: Alt görev kaydedilemedi, geri alındı.");
+    }
   }
 
-  function handleToggleSubtask(subtaskId: string, nextDone: boolean) {
+  async function handleToggleSubtask(subtaskId: string, nextDone: boolean) {
+    if (!task) return;
     setActionError(null);
-    startTransition(async () => {
-      applyOptimisticSubtask({ type: "toggle", id: subtaskId, is_done: nextDone });
-      try {
-        const res = await toggleSubtaskAction(subtaskId, nextDone);
-        if (!res.ok) {
-          setActionError(
-            res.error ?? "Alt görev durumu güncellenemedi, geri alındı."
-          );
-          return;
-        }
-        router.refresh();
-      } catch {
-        setActionError("Bağlantı hatası: Alt görev durumu geri alındı.");
+    const targetTaskId = task.id;
+
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === targetTaskId
+          ? {
+              ...t,
+              subtasks: t.subtasks.map((s) =>
+                s.id === subtaskId ? { ...s, is_done: nextDone } : s
+              ),
+            }
+          : t
+      )
+    );
+
+    try {
+      const res = await toggleSubtaskAction(subtaskId, nextDone);
+      if (!res.ok) {
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === targetTaskId
+              ? {
+                  ...t,
+                  subtasks: t.subtasks.map((s) =>
+                    s.id === subtaskId ? { ...s, is_done: !nextDone } : s
+                  ),
+                }
+              : t
+          )
+        );
+        setActionError(
+          res.error ?? "Alt görev durumu güncellenemedi, geri alındı."
+        );
       }
-    });
+    } catch {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === targetTaskId
+            ? {
+                ...t,
+                subtasks: t.subtasks.map((s) =>
+                  s.id === subtaskId ? { ...s, is_done: !nextDone } : s
+                ),
+              }
+            : t
+        )
+      );
+      setActionError("Bağlantı hatası: Alt görev durumu geri alındı.");
+    }
   }
 
-  function handleDeleteSubtask(subtaskId: string) {
+  async function handleDeleteSubtask(subtaskId: string) {
+    if (!task) return;
     setActionError(null);
-    startTransition(async () => {
-      applyOptimisticSubtask({ type: "delete", id: subtaskId });
-      try {
-        const res = await deleteSubtaskAction(subtaskId);
-        if (!res.ok) {
-          setActionError(
-            res.error ?? "Alt görev silinemedi, değişiklik geri alındı."
-          );
-          return;
-        }
-        router.refresh();
-      } catch {
-        setActionError("Bağlantı hatası: Alt görev silme işlemi geri alındı.");
+    const targetTaskId = task.id;
+    const prevSubtasks = task.subtasks;
+
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === targetTaskId
+          ? { ...t, subtasks: t.subtasks.filter((s) => s.id !== subtaskId) }
+          : t
+      )
+    );
+
+    try {
+      const res = await deleteSubtaskAction(subtaskId);
+      if (!res.ok) {
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === targetTaskId ? { ...t, subtasks: prevSubtasks } : t
+          )
+        );
+        setActionError(
+          res.error ?? "Alt görev silinemedi, değişiklik geri alındı."
+        );
       }
-    });
+    } catch {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === targetTaskId ? { ...t, subtasks: prevSubtasks } : t
+        )
+      );
+      setActionError("Bağlantı hatası: Alt görev silme işlemi geri alındı.");
+    }
   }
 
   async function handleUploadFiles(files: FileList | null) {
     if (!task || !files || files.length === 0) return;
     setUploading(true);
+    const targetTaskId = task.id;
     try {
+      let addedCount = 0;
       for (const file of Array.from(files)) {
-        const uploaded = await uploadStudioMedia("task", task.id, file);
-        await registerTaskAttachmentAction({
-          taskId: task.id,
+        const uploaded = await uploadStudioMedia("task", targetTaskId, file);
+        const regRes = await registerTaskAttachmentAction({
+          taskId: targetTaskId,
           ...uploaded,
         });
+        if (regRes.ok) addedCount += 1;
       }
-      const res = await fetch(`/api/tasks/${task.id}`);
+      const res = await fetch(`/api/tasks/${targetTaskId}`);
       if (res.ok) {
         const json = await res.json();
-        updateTaskExtras(task.id, (prev) => ({
+        updateTaskExtras(targetTaskId, (prev) => ({
           ...prev,
           attachments: json.attachments ?? [],
         }));
       }
-      router.refresh();
+      if (addedCount > 0) {
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === targetTaskId
+              ? { ...t, attachment_count: t.attachment_count + addedCount }
+              : t
+          )
+        );
+      }
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -308,11 +387,12 @@ export function TaskDetailDrawer({
     if (!task || !cleanBody) return;
     setActionError(null);
 
+    const targetTaskId = task.id;
     const tempId = `temp-comment-${Date.now()}`;
     const optimisticComment: StudioComment = {
       id: tempId,
       target_type: "task",
-      target_id: task.id,
+      target_id: targetTaskId,
       author_id: currentUserId,
       body: cleanBody,
       created_at: new Date().toISOString(),
@@ -320,15 +400,20 @@ export function TaskDetailDrawer({
     };
 
     setCommentBody("");
-    updateTaskExtras(task.id, (prev) => ({
+    updateTaskExtras(targetTaskId, (prev) => ({
       ...prev,
       comments: [...prev.comments, optimisticComment],
     }));
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === targetTaskId ? { ...t, comment_count: t.comment_count + 1 } : t
+      )
+    );
 
     try {
-      const res = await addTaskCommentAction(task.id, cleanBody);
+      const res = await addTaskCommentAction(targetTaskId, cleanBody);
       if (res.ok && res.data) {
-        updateTaskExtras(task.id, (prev) => ({
+        updateTaskExtras(targetTaskId, (prev) => ({
           ...prev,
           comments: prev.comments.map((c) =>
             c.id === tempId
@@ -336,24 +421,35 @@ export function TaskDetailDrawer({
               : c
           ),
         }));
-        startTransition(() => {
-          router.refresh();
-        });
       } else {
-        updateTaskExtras(task.id, (prev) => ({
+        updateTaskExtras(targetTaskId, (prev) => ({
           ...prev,
           comments: prev.comments.filter((c) => c.id !== tempId),
         }));
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === targetTaskId
+              ? { ...t, comment_count: Math.max(0, t.comment_count - 1) }
+              : t
+          )
+        );
         setCommentBody(cleanBody);
         setActionError(
           res.error ?? "Yorum veritabanına kaydedilemedi, geri alındı."
         );
       }
     } catch {
-      updateTaskExtras(task.id, (prev) => ({
+      updateTaskExtras(targetTaskId, (prev) => ({
         ...prev,
         comments: prev.comments.filter((c) => c.id !== tempId),
       }));
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === targetTaskId
+            ? { ...t, comment_count: Math.max(0, t.comment_count - 1) }
+            : t
+        )
+      );
       setCommentBody(cleanBody);
       setActionError("Bağlantı hatası: Yorum kaydedilemedi, geri alındı.");
     }
@@ -390,7 +486,10 @@ export function TaskDetailDrawer({
           <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => onEdit(task)}
+              onClick={() => {
+                onClose();
+                onEdit(task);
+              }}
               className="rounded-lg border border-[#242e40] bg-[#131926] p-2 text-zinc-300 hover:border-amber-500/40 hover:text-amber-300"
               title="Düzenle"
             >
@@ -402,9 +501,18 @@ export function TaskDetailDrawer({
                 if (
                   window.confirm("Bu görevi kalıcı olarak silmek istiyor musun?")
                 ) {
-                  await deleteTaskAction(task.id);
+                  const deletedId = task.id;
                   onClose();
-                  router.refresh();
+                  if (onDeleteTask) {
+                    onDeleteTask(deletedId);
+                  } else {
+                    const snapshot = task;
+                    setTasks((prev) => prev.filter((t) => t.id !== deletedId));
+                    const res = await deleteTaskAction(deletedId);
+                    if (!res.ok) {
+                      setTasks((prev) => [snapshot, ...prev]);
+                    }
+                  }
                 }
               }}
               className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-2 text-rose-300 hover:bg-rose-500/20"
@@ -444,11 +552,9 @@ export function TaskDetailDrawer({
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <select
                 value={task.status}
-                onChange={async (e) => {
+                onChange={(e) => {
                   const nextStatus = e.target.value as TaskStatus;
                   onStatusChangeOptimistic(task.id, nextStatus);
-                  await moveTaskStatusAction(task.id, nextStatus);
-                  router.refresh();
                 }}
                 className="rounded-lg border border-[#2a3447] bg-[#131926] px-3 py-1.5 text-xs font-medium text-zinc-100 focus:border-amber-500/60 focus:outline-none"
               >
@@ -596,7 +702,7 @@ export function TaskDetailDrawer({
             )}
 
             <div className="space-y-1.5">
-              {optimisticSubtasks.map((sub) => (
+              {subtasks.map((sub) => (
                 <div
                   key={sub.id}
                   className="flex items-center justify-between gap-2 rounded-lg border border-[#1a2130] bg-[#0a0e15] px-3 py-2 text-xs"
@@ -706,14 +812,27 @@ export function TaskDetailDrawer({
                       <button
                         type="button"
                         onClick={async () => {
-                          updateTaskExtras(task.id, (prev) => ({
+                          const targetTaskId = task.id;
+                          updateTaskExtras(targetTaskId, (prev) => ({
                             ...prev,
                             attachments: prev.attachments.filter(
                               (a) => a.id !== att.id
                             ),
                           }));
+                          setTasks((prev) =>
+                            prev.map((t) =>
+                              t.id === targetTaskId
+                                ? {
+                                    ...t,
+                                    attachment_count: Math.max(
+                                      0,
+                                      t.attachment_count - 1
+                                    ),
+                                  }
+                                : t
+                            )
+                          );
                           await deleteTaskAttachmentAction(att.id, att.file_path);
-                          router.refresh();
                         }}
                         className="text-zinc-500 hover:text-rose-400"
                       >
@@ -750,33 +869,60 @@ export function TaskDetailDrawer({
                         type="button"
                         onClick={async () => {
                           setActionError(null);
+                          const targetTaskId = task.id;
                           const snapshot = comments;
-                          updateTaskExtras(task.id, (prev) => ({
+                          updateTaskExtras(targetTaskId, (prev) => ({
                             ...prev,
                             comments: prev.comments.filter(
                               (c) => c.id !== comment.id
                             ),
                           }));
+                          setTasks((prev) =>
+                            prev.map((t) =>
+                              t.id === targetTaskId
+                                ? {
+                                    ...t,
+                                    comment_count: Math.max(
+                                      0,
+                                      t.comment_count - 1
+                                    ),
+                                  }
+                                : t
+                            )
+                          );
                           try {
                             const res = await deleteTaskCommentAction(comment.id);
                             if (!res.ok) {
-                              updateTaskExtras(task.id, (prev) => ({
+                              updateTaskExtras(targetTaskId, (prev) => ({
                                 ...prev,
                                 comments: snapshot,
                               }));
+                              setTasks((prev) =>
+                                prev.map((t) =>
+                                  t.id === targetTaskId
+                                    ? {
+                                        ...t,
+                                        comment_count: t.comment_count + 1,
+                                      }
+                                    : t
+                                )
+                              );
                               setActionError(
                                 res.error ?? "Yorum silinemedi, geri alındı."
                               );
-                              return;
                             }
-                            startTransition(() => {
-                              router.refresh();
-                            });
                           } catch {
-                            updateTaskExtras(task.id, (prev) => ({
+                            updateTaskExtras(targetTaskId, (prev) => ({
                               ...prev,
                               comments: snapshot,
                             }));
+                            setTasks((prev) =>
+                              prev.map((t) =>
+                                t.id === targetTaskId
+                                  ? { ...t, comment_count: t.comment_count + 1 }
+                                  : t
+                              )
+                            );
                             setActionError(
                               "Bağlantı hatası: Yorum silme işlemi geri alındı."
                             );

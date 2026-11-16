@@ -2,7 +2,7 @@
 
 import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
-import { sendDiscordNotification } from "@/lib/discord";
+import { queueDiscordNotification } from "@/lib/discord";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { TaskPriority, TaskStatus } from "@/types/studio";
 
@@ -34,12 +34,12 @@ async function requireAuthSupabase() {
     return { supabase: null, user: null, error: "Supabase yapılandırılmamış." };
   }
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user) {
     return { supabase: null, user: null, error: "Oturum bulunamadı." };
   }
-  return { supabase, user, error: null };
+  return { supabase, user: session.user, error: null };
 }
 
 function revalidateTaskViews() {
@@ -63,7 +63,7 @@ export async function createTaskAction(input: {
   milestone_id: string | null;
   source_idea_id: string | null;
   blocked_by_task_id: string | null;
-}): Promise<TaskActionResult<{ id: string }>> {
+}): Promise<TaskActionResult<{ id: string; created_at: string }>> {
   const parsed = taskPayloadSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -92,28 +92,17 @@ export async function createTaskAction(input: {
       source_idea_id: parsed.data.source_idea_id,
       blocked_by_task_id: parsed.data.blocked_by_task_id,
     })
-    .select("id")
+    .select("id, created_at")
     .single();
 
   if (error || !data) {
     return { ok: false, error: error?.message ?? "Görev oluşturulamadı." };
   }
 
-  let assigneeName = "Atanmadı";
-  if (parsed.data.assignee_id) {
-    const { data: assignee } = await supabase
-      .from("profiles")
-      .select("display_name")
-      .eq("id", parsed.data.assignee_id)
-      .maybeSingle();
-    if (assignee?.display_name) assigneeName = assignee.display_name;
-  }
-
-  await sendDiscordNotification({
+  queueDiscordNotification({
     title: `🧩 Yeni Görev: ${parsed.data.title}`,
     color: 0x06b6d4,
     fields: [
-      { name: "Atanan", value: assigneeName, inline: true },
       { name: "Öncelik", value: parsed.data.priority.toUpperCase(), inline: true },
       ...(parsed.data.ue_tags.length > 0
         ? [{ name: "UE5 Etiketleri", value: parsed.data.ue_tags.join(", ") }]
@@ -122,7 +111,7 @@ export async function createTaskAction(input: {
   });
 
   revalidateTaskViews();
-  return { ok: true, data: { id: data.id } };
+  return { ok: true, data: { id: data.id, created_at: data.created_at } };
 }
 
 export async function updateTaskAction(
@@ -200,7 +189,7 @@ export async function moveTaskStatusAction(
 
   if ((status === "testing" || status === "done") && updatedTask) {
     const label = status === "testing" ? "🧪 Test Bekliyor" : "✅ Tamamlandı";
-    await sendDiscordNotification({
+    queueDiscordNotification({
       title: `${label}: ${updatedTask.title}`,
       color: status === "testing" ? 0xa855f7 : 0x10b981,
     });

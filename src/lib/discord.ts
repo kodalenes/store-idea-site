@@ -1,4 +1,5 @@
 import "server-only";
+import { after } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export interface DiscordEmbedField {
@@ -95,4 +96,12 @@ export async function sendDiscordNotification(
       error: err instanceof Error ? err.message : "Discord bildirimi gönderilemedi.",
     };
   }
+}
+
+export function queueDiscordNotification(
+  payload: DiscordNotificationPayload
+): void {
+  after(async () => {
+    await sendDiscordNotification(payload);
+  });
 }

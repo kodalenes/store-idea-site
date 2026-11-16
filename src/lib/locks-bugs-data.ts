@@ -2,59 +2,12 @@ import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { getRequestAuth, getRequestProfiles } from "@/lib/studio-data";
 import type {
-  AssetLock,
-  AssetLockWithProfile,
   Milestone,
   Profile,
   Subtask,
   Task,
   TaskBoardItem,
 } from "@/types/studio";
-
-export async function getAssetLocksData(): Promise<{
-  isConfigured: boolean;
-  currentUserId: string | null;
-  locks: AssetLockWithProfile[];
-  teamProfiles: Profile[];
-}> {
-  "use cache: private";
-  cacheTag("studio:locks");
-  cacheLife({ stale: 300, revalidate: 60, expire: 300 });
-
-  const { isConfigured, supabase, user } = await getRequestAuth();
-  if (!isConfigured || !supabase || !user) {
-    return {
-      isConfigured,
-      currentUserId: null,
-      locks: [],
-      teamProfiles: [],
-    };
-  }
-
-  const [locksRes, teamProfiles] = await Promise.all([
-    supabase
-      .from("asset_locks")
-      .select("id, asset_path, lock_type, locked_by, note, locked_at")
-      .order("locked_at", { ascending: false }),
-    getRequestProfiles(),
-  ]);
-
-  const profileMap = new Map(teamProfiles.map((p) => [p.id, p]));
-
-  const locks: AssetLockWithProfile[] = ((locksRes.data ?? []) as AssetLock[]).map(
-    (lock) => ({
-      ...lock,
-      owner: profileMap.get(lock.locked_by) ?? null,
-    })
-  );
-
-  return {
-    isConfigured: true,
-    currentUserId: user.id,
-    locks,
-    teamProfiles,
-  };
-}
 
 export async function getBugsPageData(): Promise<{
   isConfigured: boolean;

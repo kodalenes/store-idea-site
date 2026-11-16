@@ -1,15 +1,8 @@
 "use client";
 
-import {
-  startTransition,
-  useMemo,
-  useOptimistic,
-  useRef,
-  useState,
-} from "react";
+import { useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   Bug,
   Plus,
@@ -30,9 +23,10 @@ import {
   UE_DISCIPLINE_TAGS,
 } from "@/lib/constants";
 import { uploadStudioMedia } from "@/lib/media-upload";
-import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
+import { useStudioStore } from "@/components/studio/studio-store";
 import { createBugAction } from "@/app/actions/bugs";
 import {
+  deleteTaskAction,
   moveTaskStatusAction,
   registerTaskAttachmentAction,
   updateTaskAction,
@@ -56,8 +50,6 @@ const TaskFormModal = dynamic(
 );
 import type {
   BugSeverity,
-  Milestone,
-  Profile,
   TaskBoardItem,
   TaskPriority,
   TaskStatus,
@@ -71,28 +63,22 @@ const SEVERITY_BADGES: Record<BugSeverity, string> = {
   minor: "border-zinc-500/40 bg-zinc-500/15 text-zinc-300",
 };
 
-export function BugsBoard({
-  initialBugs,
-  teamProfiles,
-  milestones,
-  currentUserId,
-  isConfigured,
-}: {
-  initialBugs: TaskBoardItem[];
-  teamProfiles: Profile[];
-  milestones: Milestone[];
-  currentUserId: string | null;
-  isConfigured: boolean;
-}) {
-  const router = useRouter();
+export function BugsBoard() {
+  const {
+    tasks,
+    setTasks,
+    teamProfiles,
+    milestones,
+    currentUserId,
+    currentProfile,
+    isConfigured,
+    navigateTab,
+  } = useStudioStore();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [optimisticBugs, moveBugOptimistic] = useOptimistic(
-    initialBugs,
-    (state, update: { bugId: string; status: TaskStatus }) =>
-      state.map((b) =>
-        b.id === update.bugId ? { ...b, status: update.status } : b
-      )
+  const bugs = useMemo(
+    () => tasks.filter((task) => task.kind === "bug"),
+    [tasks]
   );
 
   // Filters
@@ -100,9 +86,9 @@ export function BugsBoard({
   const [severityFilter, setSeverityFilter] = useState<BugSeverity | "all">(
     "all"
   );
-  const [statusFilter, setStatusFilter] = useState<"open" | "done" | "all">(
-    "open"
-  );
+  const [statusFilter, setStatusFilter] = useState<
+    "open" | "crash" | "testing" | "done" | "all"
+  >("open");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
 
   // Feedback & Selection
@@ -120,29 +106,33 @@ export function BugsBoard({
   const [descriptionMd, setDescriptionMd] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
   const [milestoneId, setMilestoneId] = useState(
-    milestones.find((m) => m.status === "active")?.id ?? ""
+    () => milestones.find((m) => m.status === "active")?.id ?? ""
   );
   const [ueTags, setUeTags] = useState<string[]>(["Blueprint"]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-  const [submitting, setSubmitting] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  useRealtimeRefresh("bugs-live", [{ table: "tasks" }]);
-
   const stats = useMemo(() => {
-    const open = optimisticBugs.filter((b) => b.status !== "done");
+    const open = bugs.filter((b) => b.status !== "done");
     return {
       openCount: open.length,
       crashCount: open.filter((b) => b.bug_severity === "crash").length,
       testingCount: open.filter((b) => b.status === "testing").length,
-      doneCount: optimisticBugs.filter((b) => b.status === "done").length,
+      doneCount: bugs.filter((b) => b.status === "done").length,
     };
-  }, [optimisticBugs]);
+  }, [bugs]);
 
   const filteredBugs = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return optimisticBugs.filter((b) => {
+    return bugs.filter((b) => {
       if (statusFilter === "open" && b.status === "done") return false;
+      if (
+        statusFilter === "crash" &&
+        (b.status === "done" || b.bug_severity !== "crash")
+      ) {
+        return false;
+      }
+      if (statusFilter === "testing" && b.status !== "testing") return false;
       if (statusFilter === "done" && b.status !== "done") return false;
       if (severityFilter !== "all" && b.bug_severity !== severityFilter) {
         return false;
@@ -165,7 +155,7 @@ export function BugsBoard({
       return true;
     });
   }, [
-    optimisticBugs,
+    bugs,
     search,
     severityFilter,
     statusFilter,
@@ -174,84 +164,270 @@ export function BugsBoard({
   ]);
 
   const selectedBug = useMemo(
-    () => optimisticBugs.find((b) => b.id === selectedBugId) ?? null,
-    [optimisticBugs, selectedBugId]
+    () => bugs.find((b) => b.id === selectedBugId) ?? null,
+    [bugs, selectedBugId]
   );
 
-  function handleQuickStatusChange(bugId: string, nextStatus: TaskStatus) {
+  async function handleQuickStatusChange(bugId: string, nextStatus: TaskStatus) {
+    if (bugId.startsWith("temp-")) return;
+    const prevBug = bugs.find((b) => b.id === bugId);
+    if (!prevBug || prevBug.status === nextStatus) return;
+
     setBoardError(null);
-    startTransition(async () => {
-      moveBugOptimistic({ bugId, status: nextStatus });
-      try {
-        const res = await moveTaskStatusAction(bugId, nextStatus);
-        if (!res.ok) {
-          setBoardError(
-            res.error ?? "Bug durumu güncellenemedi, değişiklik geri alındı."
-          );
-          return;
-        }
-        router.refresh();
-      } catch {
-        setBoardError("Bağlantı hatası: Bug durumu geri alındı.");
+    const now = new Date().toISOString();
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === bugId ? { ...t, status: nextStatus, updated_at: now } : t
+      )
+    );
+
+    try {
+      const res = await moveTaskStatusAction(bugId, nextStatus);
+      if (!res.ok) {
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === bugId
+              ? { ...t, status: prevBug.status, updated_at: prevBug.updated_at }
+              : t
+          )
+        );
+        setBoardError(
+          res.error ?? "Bug durumu güncellenemedi, değişiklik geri alındı."
+        );
       }
-    });
+    } catch {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === bugId
+            ? { ...t, status: prevBug.status, updated_at: prevBug.updated_at }
+            : t
+        )
+      );
+      setBoardError("Bağlantı hatası: Bug durumu geri alındı.");
+    }
   }
 
   async function handleCreateBug(e: React.FormEvent) {
     e.preventDefault();
+    const cleanTitle = title.trim();
+    if (!cleanTitle) {
+      setCreateError("Hata başlığı zorunludur.");
+      return;
+    }
+
     setCreateError(null);
-    setSubmitting(true);
+    setBoardError(null);
+
+    const payload = {
+      title: cleanTitle,
+      description_md: descriptionMd,
+      bug_severity: severity,
+      priority,
+      repro_steps: reproSteps,
+      build_version: buildVersion,
+      ue_tags: ueTags,
+      assignee_id: assigneeId || null,
+      milestone_id: milestoneId || null,
+    };
+    const filesToUpload = [...pendingFiles];
+
+    const tempId = `temp-bug-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const now = new Date().toISOString();
+    const selectedMilestone = payload.milestone_id
+      ? milestones.find((m) => m.id === payload.milestone_id) ?? null
+      : null;
+
+    const optimisticBug: TaskBoardItem = {
+      id: tempId,
+      title: cleanTitle,
+      description_md: payload.description_md,
+      kind: "bug",
+      status: "backlog",
+      priority: payload.priority,
+      ue_tags: payload.ue_tags,
+      assignee_id: payload.assignee_id,
+      reporter_id: currentUserId,
+      milestone_id: payload.milestone_id,
+      source_idea_id: null,
+      blocked_by_task_id: null,
+      bug_severity: payload.bug_severity,
+      repro_steps: payload.repro_steps,
+      build_version: payload.build_version,
+      position: Date.now(),
+      created_at: now,
+      updated_at: now,
+      assignee: payload.assignee_id
+        ? teamProfiles.find((p) => p.id === payload.assignee_id) ?? null
+        : null,
+      reporter:
+        currentProfile ??
+        (currentUserId
+          ? teamProfiles.find((p) => p.id === currentUserId) ?? null
+          : null),
+      milestone: selectedMilestone
+        ? { id: selectedMilestone.id, title: selectedMilestone.title }
+        : null,
+      source_idea: null,
+      blocked_by_task: null,
+      subtasks: [],
+      comment_count: 0,
+      attachment_count: filesToUpload.length,
+    };
+
+    // 0 ms Optimistic UI + close modal immediately
+    setTasks((prev) => [optimisticBug, ...prev]);
+    setTitle("");
+    setBuildVersion("");
+    setReproSteps("");
+    setDescriptionMd("");
+    setPendingFiles([]);
+    setCreateOpen(false);
 
     try {
-      const res = await createBugAction({
-        title,
-        description_md: descriptionMd,
-        bug_severity: severity,
-        priority,
-        repro_steps: reproSteps,
-        build_version: buildVersion,
-        ue_tags: ueTags,
-        assignee_id: assigneeId || null,
-        milestone_id: milestoneId || null,
-      });
-
+      const res = await createBugAction(payload);
       if (!res.ok || !res.data?.id) {
-        setCreateError(res.error ?? "Bug raporu oluşturulamadı.");
-        setSubmitting(false);
+        setTasks((prev) => prev.filter((t) => t.id !== tempId));
+        setBoardError(
+          res.error ?? "Bug raporu oluşturulamadı, değişiklik geri alındı."
+        );
         return;
       }
 
-      if (pendingFiles.length > 0) {
-        for (const file of pendingFiles) {
-          const uploaded = await uploadStudioMedia("task", res.data.id, file);
-          await registerTaskAttachmentAction({
-            taskId: res.data.id,
-            ...uploaded,
-          });
+      const realId = res.data.id;
+      const realCreatedAt = res.data.created_at || now;
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === tempId
+            ? {
+                ...t,
+                id: realId,
+                created_at: realCreatedAt,
+                updated_at: realCreatedAt,
+              }
+            : t
+        )
+      );
+
+      if (filesToUpload.length > 0) {
+        let uploadedCount = 0;
+        let failedCount = 0;
+        for (const file of filesToUpload) {
+          try {
+            const uploaded = await uploadStudioMedia("task", realId, file);
+            const regRes = await registerTaskAttachmentAction({
+              taskId: realId,
+              ...uploaded,
+            });
+            if (regRes.ok) {
+              uploadedCount += 1;
+            } else {
+              failedCount += 1;
+            }
+          } catch {
+            failedCount += 1;
+          }
+        }
+        if (failedCount > 0) {
+          setTasks((prev) =>
+            prev.map((t) =>
+              t.id === realId ? { ...t, attachment_count: uploadedCount } : t
+            )
+          );
+          setBoardError(
+            "Bug kaydedildi ancak bazı ekran görüntüleri yüklenemedi."
+          );
         }
       }
-
-      setTitle("");
-      setBuildVersion("");
-      setReproSteps("");
-      setDescriptionMd("");
-      setPendingFiles([]);
-      setCreateOpen(false);
-      router.refresh();
     } catch (err) {
-      setCreateError(
-        err instanceof Error ? err.message : "Bug raporu gönderilemedi."
+      setTasks((prev) => prev.filter((t) => t.id !== tempId));
+      setBoardError(
+        err instanceof Error
+          ? `${err.message} (Değişiklik geri alındı)`
+          : "Bağlantı hatası: Bug raporu kaydedilemedi, değişiklik geri alındı."
       );
-    } finally {
-      setSubmitting(false);
     }
   }
 
   async function handleEditSubmit(values: TaskFormValues) {
-    if (!editingBug) return { ok: false, error: "Kayıt bulunamadı." };
-    const res = await updateTaskAction(editingBug.id, values);
-    if (res.ok) router.refresh();
-    return res;
+    const prevBug = editingBug;
+    if (!prevBug) return { ok: false, error: "Kayıt bulunamadı." };
+    setBoardError(null);
+
+    const nextAssignee = values.assignee_id
+      ? teamProfiles.find((p) => p.id === values.assignee_id) ?? null
+      : null;
+    const nextMilestone = values.milestone_id
+      ? milestones.find((m) => m.id === values.milestone_id) ?? null
+      : null;
+    const nextBlocker = values.blocked_by_task_id
+      ? tasks.find((t) => t.id === values.blocked_by_task_id) ?? null
+      : null;
+
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === prevBug.id
+          ? {
+              ...t,
+              title: values.title.trim() || t.title,
+              description_md: values.description_md,
+              status: values.status,
+              priority: values.priority,
+              ue_tags: values.ue_tags,
+              assignee_id: values.assignee_id,
+              assignee: nextAssignee,
+              milestone_id: values.milestone_id,
+              milestone: nextMilestone
+                ? { id: nextMilestone.id, title: nextMilestone.title }
+                : null,
+              source_idea_id: values.source_idea_id,
+              blocked_by_task_id: values.blocked_by_task_id,
+              blocked_by_task: nextBlocker
+                ? {
+                    id: nextBlocker.id,
+                    title: nextBlocker.title,
+                    status: nextBlocker.status,
+                  }
+                : null,
+              updated_at: new Date().toISOString(),
+            }
+          : t
+      )
+    );
+
+    try {
+      const res = await updateTaskAction(prevBug.id, values);
+      if (!res.ok) {
+        setTasks((prev) =>
+          prev.map((t) => (t.id === prevBug.id ? prevBug : t))
+        );
+        setBoardError(
+          res.error ?? "Bug güncellenemedi, değişiklik geri alındı."
+        );
+      }
+      return res;
+    } catch {
+      setTasks((prev) => prev.map((t) => (t.id === prevBug.id ? prevBug : t)));
+      setBoardError("Bağlantı hatası: Bug düzenleme işlemi geri alındı.");
+      return { ok: false, error: "Bağlantı hatası." };
+    }
+  }
+
+  async function handleDeleteBug(bugId: string) {
+    const targetBug = bugs.find((b) => b.id === bugId);
+    if (!targetBug) return;
+    setBoardError(null);
+    setTasks((prev) => prev.filter((t) => t.id !== bugId));
+
+    try {
+      const res = await deleteTaskAction(bugId);
+      if (!res.ok) {
+        setTasks((prev) => [targetBug, ...prev]);
+        setBoardError(res.error ?? "Bug silinemedi, değişiklik geri alındı.");
+      }
+    } catch {
+      setTasks((prev) => [targetBug, ...prev]);
+      setBoardError("Bağlantı hatası: Silme işlemi geri alındı.");
+    }
   }
 
   return (
@@ -272,6 +448,12 @@ export function BugsBoard({
         <div className="flex items-center gap-2">
           <Link
             href="/tasks"
+            onClick={(e) => {
+              if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                navigateTab("/tasks");
+              }
+            }}
             className="inline-flex items-center gap-1.5 rounded-lg border border-[#242e40] bg-[#10141d] px-3.5 py-2.5 text-xs font-medium text-zinc-200 hover:border-amber-500/40"
           >
             <KanbanSquare className="h-4 w-4 text-zinc-400" />
@@ -289,34 +471,6 @@ export function BugsBoard({
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-[#1f2735] bg-[#10141d] p-4">
-          <p className="text-xs text-zinc-400">Açık Buglar</p>
-          <p className="mt-1 text-2xl font-bold text-zinc-100">
-            {stats.openCount}
-          </p>
-        </div>
-        <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-4">
-          <p className="text-xs text-rose-300">Crash / Blocker</p>
-          <p className="mt-1 text-2xl font-bold text-rose-200">
-            {stats.crashCount}
-          </p>
-        </div>
-        <div className="rounded-xl border border-purple-500/30 bg-purple-500/5 p-4">
-          <p className="text-xs text-purple-300">Test Bekleyen</p>
-          <p className="mt-1 text-2xl font-bold text-purple-200">
-            {stats.testingCount}
-          </p>
-        </div>
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
-          <p className="text-xs text-emerald-300">Çözülen</p>
-          <p className="mt-1 text-2xl font-bold text-emerald-200">
-            {stats.doneCount}
-          </p>
-        </div>
-      </div>
-
       {boardError && (
         <div className="flex items-center justify-between gap-2 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-2.5 text-xs text-rose-200">
           <span>{boardError}</span>
@@ -330,37 +484,83 @@ export function BugsBoard({
         </div>
       )}
 
-      {/* Filters */}
-      <div className="grid gap-3 rounded-xl border border-[#1f2735] bg-[#10141d] p-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+      {/* Compact Bugs Toolbar with Inline Status Counts */}
+      <div className="flex flex-wrap items-center gap-2.5 rounded-xl border border-[#1f2735] bg-[#10141d] p-3">
+        <div className="flex flex-wrap items-center gap-1 rounded-lg border border-[#242e40] bg-[#080a0f] p-0.5 text-xs">
+          <button
+            type="button"
+            onClick={() => setStatusFilter("open")}
+            className={`rounded-md px-2.5 py-1 font-medium transition ${
+              statusFilter === "open"
+                ? "bg-[#1a2232] text-zinc-100"
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            Açık ({stats.openCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter("crash")}
+            className={`rounded-md px-2.5 py-1 font-medium transition ${
+              statusFilter === "crash"
+                ? "bg-rose-500/20 text-rose-300"
+                : "text-zinc-400 hover:text-rose-300"
+            }`}
+          >
+            Crash ({stats.crashCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter("testing")}
+            className={`rounded-md px-2.5 py-1 font-medium transition ${
+              statusFilter === "testing"
+                ? "bg-purple-500/20 text-purple-300"
+                : "text-zinc-400 hover:text-purple-300"
+            }`}
+          >
+            Testte ({stats.testingCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter("done")}
+            className={`rounded-md px-2.5 py-1 font-medium transition ${
+              statusFilter === "done"
+                ? "bg-emerald-500/20 text-emerald-300"
+                : "text-zinc-400 hover:text-emerald-300"
+            }`}
+          >
+            Çözülen ({stats.doneCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter("all")}
+            className={`rounded-md px-2.5 py-1 font-medium transition ${
+              statusFilter === "all"
+                ? "bg-[#1a2232] text-zinc-100"
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            Tümü ({bugs.length})
+          </button>
+        </div>
+
+        <div className="relative min-w-44 flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Bug, repro veya build ara..."
-            className="w-full rounded-lg border border-[#242e40] bg-[#080a0f] py-2 pr-3 pl-9 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-rose-500/60 focus:outline-none"
+            className="w-full rounded-lg border border-[#242e40] bg-[#080a0f] py-1.5 pr-3 pl-8.5 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-rose-500/60 focus:outline-none"
           />
         </div>
-
-        <select
-          value={statusFilter}
-          onChange={(e) =>
-            setStatusFilter(e.target.value as "open" | "done" | "all")
-          }
-          className="rounded-lg border border-[#242e40] bg-[#080a0f] px-3 py-2 text-xs text-zinc-200 focus:border-rose-500/60 focus:outline-none"
-        >
-          <option value="open">Durum: Açık Buglar</option>
-          <option value="done">Durum: Çözülenler</option>
-          <option value="all">Durum: Tümü</option>
-        </select>
 
         <select
           value={severityFilter}
           onChange={(e) =>
             setSeverityFilter(e.target.value as BugSeverity | "all")
           }
-          className="rounded-lg border border-[#242e40] bg-[#080a0f] px-3 py-2 text-xs text-zinc-200 focus:border-rose-500/60 focus:outline-none"
+          className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-rose-500/60 focus:outline-none"
         >
           <option value="all">Ciddiyet: Tümü</option>
           {BUG_SEVERITIES.map((s) => (
@@ -373,7 +573,7 @@ export function BugsBoard({
         <select
           value={assigneeFilter}
           onChange={(e) => setAssigneeFilter(e.target.value)}
-          className="rounded-lg border border-[#242e40] bg-[#080a0f] px-3 py-2 text-xs text-zinc-200 focus:border-rose-500/60 focus:outline-none"
+          className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-rose-500/60 focus:outline-none"
         >
           <option value="all">Atanan: Tümü</option>
           {currentUserId && <option value="mine">Bana Atananlar</option>}
@@ -392,7 +592,7 @@ export function BugsBoard({
             <CheckCircle2 className="h-6 w-6" />
           </div>
           <h3 className="mt-4 text-base font-semibold text-zinc-100">
-            {optimisticBugs.length === 0
+            {bugs.length === 0
               ? "Henüz bug kaydı yok"
               : "Filtreye uyan bug bulunamadı"}
           </h3>
@@ -411,11 +611,19 @@ export function BugsBoard({
               TASK_PRIORITIES.find((p) => p.value === bug.priority) ??
               TASK_PRIORITIES[1];
 
+            const isPending = bug.id.startsWith("temp-");
+
             return (
               <div
                 key={bug.id}
-                onClick={() => setSelectedBugId(bug.id)}
-                className="cursor-pointer rounded-xl border border-[#1f2735] bg-[#10141d] p-4 transition hover:border-rose-500/40 hover:bg-[#131823]"
+                onClick={() => {
+                  if (!isPending) setSelectedBugId(bug.id);
+                }}
+                className={`rounded-xl border border-[#1f2735] bg-[#10141d] p-4 transition ${
+                  isPending
+                    ? "opacity-80"
+                    : "cursor-pointer hover:border-rose-500/40 hover:bg-[#131823]"
+                }`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1 space-y-1.5">
@@ -444,6 +652,11 @@ export function BugsBoard({
 
                     <h3 className="text-sm font-semibold text-zinc-100">
                       {bug.title}
+                      {isPending && (
+                        <span className="ml-2 text-[11px] font-normal text-amber-300/80">
+                          (Kaydediliyor...)
+                        </span>
+                      )}
                     </h3>
 
                     {bug.repro_steps && (
@@ -460,13 +673,14 @@ export function BugsBoard({
                   >
                     <select
                       value={bug.status}
+                      disabled={isPending}
                       onChange={(e) =>
                         handleQuickStatusChange(
                           bug.id,
                           e.target.value as TaskStatus
                         )
                       }
-                      className="w-full rounded-lg border border-[#2a3447] bg-[#080a0f] px-2.5 py-1.5 text-xs font-medium text-zinc-200 focus:border-amber-500/60 focus:outline-none sm:w-auto"
+                      className="w-full rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs font-medium text-zinc-200 focus:border-amber-500/60 focus:outline-none disabled:opacity-50 sm:w-auto"
                     >
                       {TASK_STATUSES.map((s) => (
                         <option key={s.value} value={s.value}>
@@ -774,10 +988,9 @@ export function BugsBoard({
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting}
-                  className="rounded-lg bg-rose-500 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-400 disabled:opacity-50"
+                  className="rounded-lg bg-rose-500 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-400"
                 >
-                  {submitting ? "Gönderiliyor..." : "Bug Raporu Aç"}
+                  Bug Raporu Aç
                 </button>
               </div>
             </form>
@@ -805,7 +1018,7 @@ export function BugsBoard({
           teamProfiles={teamProfiles}
           milestones={milestones}
           ideas={[]}
-          allTasks={optimisticBugs}
+          allTasks={tasks}
           onClose={() => setEditingBug(null)}
           onSubmit={handleEditSubmit}
         />
@@ -816,12 +1029,18 @@ export function BugsBoard({
         task={selectedBug}
         currentUserId={currentUserId}
         currentProfile={
-          teamProfiles.find((p) => p.id === currentUserId) ?? null
+          currentProfile ??
+          teamProfiles.find((p) => p.id === currentUserId) ??
+          null
         }
         onClose={() => setSelectedBugId(null)}
-        onEdit={(bug) => setEditingBug(bug)}
+        onEdit={(bug) => {
+          setSelectedBugId(null);
+          setEditingBug(bug);
+        }}
         onSelectTask={(id) => setSelectedBugId(id)}
         onStatusChangeOptimistic={handleQuickStatusChange}
+        onDeleteTask={handleDeleteBug}
       />
     </div>
   );

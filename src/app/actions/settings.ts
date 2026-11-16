@@ -58,8 +58,9 @@ export async function updateMyProfileAction(
   }
 
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
 
   if (!user) {
     return { error: "Oturum bulunamadı. Lütfen tekrar giriş yapın." };
@@ -107,8 +108,9 @@ export async function updateWorkspaceSettingsAction(
   }
 
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
 
   if (!user) {
     return { error: "Oturum bulunamadı." };
@@ -142,8 +144,9 @@ export async function sendDiscordTestAction(): Promise<{
   }
 
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
   if (!user) {
     return { ok: false, message: "Oturum bulunamadı." };
   }
