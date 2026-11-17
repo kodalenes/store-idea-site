@@ -76,6 +76,7 @@ export function KanbanBoard() {
     setTasksMilestoneFilter,
     tasksViewMode,
     setTasksViewMode,
+    navigateTab,
   } = useStudioStore();
 
   // Filters
@@ -84,7 +85,6 @@ export function KanbanBoard() {
   const [tagFilter, setTagFilter] = useState<string>("all");
   const milestoneFilter = tasksMilestoneFilter;
   const setMilestoneFilter = setTasksMilestoneFilter;
-  const [kindFilter, setKindFilter] = useState<"all" | "task" | "bug">("all");
   const [listStatusFilter, setListStatusFilter] = useState<TaskStatus | "all">(
     "all"
   );
@@ -147,15 +147,13 @@ export function KanbanBoard() {
     search.trim().length > 0 ||
     assigneeFilter !== "all" ||
     tagFilter !== "all" ||
-    milestoneFilter !== "all" ||
-    kindFilter !== "all";
+    milestoneFilter !== "all";
 
   function resetFilters() {
     setSearch("");
     setAssigneeFilter("all");
     setTagFilter("all");
     setTasksMilestoneFilter("all");
-    setKindFilter("all");
   }
 
   // Modals & Drawer
@@ -164,10 +162,19 @@ export function KanbanBoard() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [boardError, setBoardError] = useState<string | null>(null);
 
+  const tasksOnly = useMemo(
+    () => tasks.filter((t) => t.kind === "task"),
+    [tasks]
+  );
+
+  const openBugsTotal = useMemo(
+    () => tasks.filter((t) => t.kind === "bug" && t.status !== "done").length,
+    [tasks]
+  );
+
   const filteredTasks = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return tasks.filter((t) => {
-      if (kindFilter !== "all" && t.kind !== kindFilter) return false;
+    return tasksOnly.filter((t) => {
       if (assigneeFilter === "mine" && t.assignee_id !== currentUserId) {
         return false;
       }
@@ -193,12 +200,11 @@ export function KanbanBoard() {
       return true;
     });
   }, [
-    tasks,
+    tasksOnly,
     search,
     assigneeFilter,
     tagFilter,
     milestoneFilter,
-    kindFilter,
     currentUserId,
   ]);
 
@@ -219,18 +225,15 @@ export function KanbanBoard() {
     const blockedCount = filteredTasks.filter(
       (t) => Boolean(t.blocked_by_task) && t.blocked_by_task?.status !== "done"
     ).length;
-    const openBugsCount = filteredTasks.filter(
-      (t) => t.kind === "bug" && t.status !== "done"
-    ).length;
     const completionPercent = total > 0 ? Math.round((done / total) * 100) : 0;
 
     const workload = teamProfiles.map((member) => ({
       member,
-      openCount: tasks.filter(
+      openCount: tasksOnly.filter(
         (t) => t.assignee_id === member.id && t.status !== "done"
       ).length,
     }));
-    const unassignedOpenCount = tasks.filter(
+    const unassignedOpenCount = tasksOnly.filter(
       (t) => !t.assignee_id && t.status !== "done"
     ).length;
 
@@ -242,12 +245,11 @@ export function KanbanBoard() {
       todo,
       backlog,
       blockedCount,
-      openBugsCount,
       completionPercent,
       workload,
       unassignedOpenCount,
     };
-  }, [filteredTasks, tasks, teamProfiles]);
+  }, [filteredTasks, tasksOnly, teamProfiles]);
 
   async function handleMoveStatus(taskId: string, targetStatus: TaskStatus) {
     const prevTask = tasks.find((t) => t.id === taskId);
@@ -474,6 +476,16 @@ export function KanbanBoard() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          {openBugsTotal > 0 && (
+            <button
+              type="button"
+              onClick={() => navigateTab("/bugs")}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/35 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-200 transition hover:bg-rose-500/20"
+            >
+              <Bug className="h-3.5 w-3.5 text-rose-400" />
+              Buglar ({openBugsTotal} Açık)
+            </button>
+          )}
           <div
             role="group"
             aria-label="Görünüm Modu"
@@ -624,18 +636,6 @@ export function KanbanBoard() {
               {m.title}
             </option>
           ))}
-        </select>
-
-        <select
-          value={kindFilter}
-          onChange={(e) =>
-            setKindFilter(e.target.value as "all" | "task" | "bug")
-          }
-          className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
-        >
-          <option value="all">Tür: Hepsi</option>
-          <option value="task">Görev</option>
-          <option value="bug">Bug</option>
         </select>
 
         {hasActiveFilters && (
@@ -1334,12 +1334,6 @@ export function KanbanBoard() {
               <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-amber-200">
                 <AlertTriangle className="h-3 w-3 text-amber-400" />
                 Blokeli: <strong>{boardSummary.blockedCount}</strong>
-              </span>
-            )}
-            {boardSummary.openBugsCount > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-rose-200">
-                <Bug className="h-3 w-3 text-rose-400" />
-                Açık Bug: <strong>{boardSummary.openBugsCount}</strong>
               </span>
             )}
           </div>

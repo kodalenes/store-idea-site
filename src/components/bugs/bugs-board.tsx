@@ -2,7 +2,6 @@
 
 import { useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import {
   Bug,
   Plus,
@@ -15,6 +14,7 @@ import {
   Upload,
   AlertCircle,
   KanbanSquare,
+  List,
 } from "lucide-react";
 import {
   BUG_SEVERITIES,
@@ -72,9 +72,11 @@ export function BugsBoard() {
     currentUserId,
     currentProfile,
     isConfigured,
-    navigateTab,
   } = useStudioStore();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [bugsViewMode, setBugsViewMode] = useState<"list" | "kanban">("list");
+  const [draggedBugId, setDraggedBugId] = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
 
   const bugs = useMemo(
     () => tasks.filter((task) => task.kind === "bug"),
@@ -440,25 +442,41 @@ export function BugsBoard() {
           </h1>
           <p className="mt-1 text-sm text-zinc-400">
             Test sırasında bulunan hataları repro adımları, build numarası ve
-            ekran görüntüsüyle kaydedin; tüm buglar Kanban panosuna otomatik
-            düşer.
+            ekran görüntüsüyle kaydedip ayrı Bug panosunda takip edin.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Link
-            href="/tasks"
-            onClick={(e) => {
-              if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
-                e.preventDefault();
-                navigateTab("/tasks");
-              }
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[#242e40] bg-[#10141d] px-3.5 py-2.5 text-xs font-medium text-zinc-200 hover:border-amber-500/40"
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div
+            role="group"
+            aria-label="Bug Görünüm Modu"
+            className="inline-flex rounded-lg border border-[#242e40] bg-[#0c1018] p-0.5 text-xs"
           >
-            <KanbanSquare className="h-4 w-4 text-zinc-400" />
-            Kanban&apos;da Gör
-          </Link>
+            <button
+              type="button"
+              onClick={() => setBugsViewMode("list")}
+              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
+                bugsViewMode === "list"
+                  ? "bg-rose-500/20 text-rose-200"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              <List className="h-3.5 w-3.5" />
+              <span>Liste</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setBugsViewMode("kanban")}
+              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
+                bugsViewMode === "kanban"
+                  ? "bg-rose-500/20 text-rose-200"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              <KanbanSquare className="h-3.5 w-3.5" />
+              <span>Kanban</span>
+            </button>
+          </div>
           <button
             type="button"
             disabled={!isConfigured}
@@ -585,8 +603,154 @@ export function BugsBoard() {
         </select>
       </div>
 
-      {/* Bug List */}
-      {filteredBugs.length === 0 ? (
+      {/* Bug List or Bug Kanban */}
+      {bugsViewMode === "kanban" ? (
+        <div className="flex flex-col gap-4 pb-2 md:h-[500px] md:flex-row md:overflow-x-auto md:overflow-y-hidden">
+          {TASK_STATUSES.map((column) => {
+            const colBugs = bugs.filter((b) => {
+              if (b.status !== column.value) return false;
+              if (severityFilter !== "all" && b.bug_severity !== severityFilter) {
+                return false;
+              }
+              if (assigneeFilter === "mine" && b.assignee_id !== currentUserId) {
+                return false;
+              }
+              if (
+                assigneeFilter !== "all" &&
+                assigneeFilter !== "mine" &&
+                b.assignee_id !== assigneeFilter
+              ) {
+                return false;
+              }
+              const q = search.trim().toLowerCase();
+              if (q) {
+                const hay =
+                  `${b.title} ${b.repro_steps} ${b.build_version} ${b.description_md}`.toLowerCase();
+                if (!hay.includes(q)) return false;
+              }
+              return true;
+            });
+            const isDropTarget = dragOverColumn === column.value;
+
+            return (
+              <div
+                key={column.value}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (dragOverColumn !== column.value) {
+                    setDragOverColumn(column.value);
+                  }
+                }}
+                onDragLeave={() => {
+                  if (dragOverColumn === column.value) {
+                    setDragOverColumn(null);
+                  }
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverColumn(null);
+                  if (draggedBugId) {
+                    const id = draggedBugId;
+                    setDraggedBugId(null);
+                    void handleQuickStatusChange(id, column.value);
+                  }
+                }}
+                className={`flex max-h-[420px] min-h-[260px] w-full flex-col overflow-hidden rounded-xl border bg-[#0c1018] transition md:h-full md:max-h-none md:w-72 md:shrink-0 ${
+                  isDropTarget
+                    ? "border-rose-400/70 bg-rose-500/5"
+                    : `border-[#1f2735] border-t-2 ${column.accentClass}`
+                }`}
+              >
+                <div className="flex shrink-0 items-center justify-between border-b border-[#1a2130] px-3.5 py-3">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-200">
+                      {column.label}
+                    </h2>
+                    <span className="rounded-full bg-[#171e2c] px-2 py-0.5 font-mono text-[11px] text-zinc-400">
+                      {colBugs.length}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex-1 space-y-2 overflow-y-auto overscroll-contain p-2.5">
+                  {colBugs.length === 0 ? (
+                    <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-[#1e2636] text-[11px] text-zinc-600">
+                      Bug yok
+                    </div>
+                  ) : (
+                    colBugs.map((bug) => {
+                      const isPending = bug.id.startsWith("temp-");
+                      const sev = bug.bug_severity ?? "gameplay";
+                      const sevLabel =
+                        BUG_SEVERITIES.find((s) => s.value === sev)?.label ??
+                        sev;
+
+                      return (
+                        <div
+                          key={bug.id}
+                          draggable={!isPending}
+                          onDragStart={() => setDraggedBugId(bug.id)}
+                          onDragEnd={() => {
+                            setDraggedBugId(null);
+                            setDragOverColumn(null);
+                          }}
+                          onClick={() => {
+                            if (!isPending) setSelectedBugId(bug.id);
+                          }}
+                          className={`rounded-lg border border-[#1f2735] bg-[#121722] p-3 transition ${
+                            isPending
+                              ? "opacity-75"
+                              : "cursor-pointer hover:border-rose-500/50 hover:bg-[#161c29]"
+                          } ${draggedBugId === bug.id ? "opacity-50" : ""}`}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-1.5">
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${SEVERITY_BADGES[sev]}`}
+                            >
+                              {sev === "crash" ? (
+                                <AlertTriangle className="h-2.5 w-2.5" />
+                              ) : (
+                                <Bug className="h-2.5 w-2.5" />
+                              )}
+                              {sevLabel}
+                            </span>
+                            {bug.build_version && (
+                              <span className="rounded bg-[#080a0f] px-1.5 py-0.5 font-mono text-[10px] text-cyan-300">
+                                {bug.build_version}
+                              </span>
+                            )}
+                          </div>
+                          <h3 className="mt-2 text-xs font-semibold leading-snug text-zinc-100">
+                            {bug.title}
+                          </h3>
+                          <div className="mt-2.5 flex items-center justify-between border-t border-[#1d2534] pt-2 text-[10px] text-zinc-400">
+                            <span>
+                              {bug.reporter?.display_name ?? "Ekip"}
+                            </span>
+                            {bug.assignee && (
+                              <span
+                                title={bug.assignee.display_name}
+                                className="flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-zinc-950"
+                                style={{
+                                  backgroundColor: bug.assignee.avatar_color,
+                                }}
+                              >
+                                {bug.assignee.display_name
+                                  .slice(0, 2)
+                                  .toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : filteredBugs.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#242e40] bg-[#0c1018] px-6 py-14 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400">
             <CheckCircle2 className="h-6 w-6" />
