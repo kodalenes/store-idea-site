@@ -1,6 +1,7 @@
 import type {
   BugSeverity,
   IdeaCategory,
+  IdeaReferenceLink,
   IdeaStatus,
   TaskPriority,
   TaskStatus,
@@ -71,6 +72,13 @@ export const IDEA_STATUSES: {
   badgeClass: string;
 }[] = [
   {
+    value: "random",
+    label: "Random Fikir",
+    description: "Aşaması henüz belli olmayan serbest fikirler",
+    accentClass: "border-zinc-600/50",
+    badgeClass: "bg-zinc-500/15 text-zinc-300 border-zinc-500/30",
+  },
+  {
     value: "raw",
     label: "Prototip / Çekirdek",
     description: "İlk prototipte hemen denenebilir",
@@ -99,6 +107,61 @@ export const IDEA_STATUSES: {
     badgeClass: "bg-purple-500/15 text-purple-300 border-purple-500/30",
   },
 ];
+
+const RANDOM_STAGE_MARKER = { _meta: "idea_stage", stage: "random" } as const;
+
+export function resolveIdeaStatusAndLinks(
+  dbStatus: IdeaStatus,
+  rawLinks: unknown
+): { status: IdeaStatus; links: IdeaReferenceLink[] } {
+  const items = Array.isArray(rawLinks) ? rawLinks : [];
+  let hasRandomMarker = false;
+  const links: IdeaReferenceLink[] = [];
+
+  for (const item of items) {
+    if (
+      item &&
+      typeof item === "object" &&
+      (item as { _meta?: unknown })._meta === "idea_stage" &&
+      (item as { stage?: unknown }).stage === "random"
+    ) {
+      hasRandomMarker = true;
+      continue;
+    }
+    if (
+      item &&
+      typeof item === "object" &&
+      typeof (item as IdeaReferenceLink).url === "string" &&
+      typeof (item as IdeaReferenceLink).label === "string"
+    ) {
+      links.push(item as IdeaReferenceLink);
+    }
+  }
+
+  return {
+    status: dbStatus === "raw" && hasRandomMarker ? "random" : dbStatus,
+    links,
+  };
+}
+
+export function encodeIdeaStatusForDb(
+  status: IdeaStatus,
+  links: IdeaReferenceLink[]
+): {
+  dbStatus: "raw" | "discussing" | "approved" | "shelved";
+  rawLinks: unknown[];
+} {
+  if (status === "random") {
+    return {
+      dbStatus: "raw",
+      rawLinks: [...links, RANDOM_STAGE_MARKER],
+    };
+  }
+  return {
+    dbStatus: status,
+    rawLinks: [...links],
+  };
+}
 
 export const TASK_STATUSES: {
   value: TaskStatus;

@@ -1,11 +1,11 @@
 import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
+import { resolveIdeaStatusAndLinks } from "@/lib/constants";
 import { getRequestAuth } from "@/lib/studio-data";
 import type {
   DriveAssetEvent,
   Idea,
   IdeaListItem,
-  IdeaReferenceLink,
   Milestone,
   Profile,
   Subtask,
@@ -35,17 +35,6 @@ const DEFAULT_WORKSPACE: WorkspaceSettings = {
   discord_webhook_url: null,
   updated_at: new Date().toISOString(),
 };
-
-function normalizeLinks(raw: unknown): IdeaReferenceLink[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.filter(
-    (item): item is IdeaReferenceLink =>
-      Boolean(item) &&
-      typeof item === "object" &&
-      typeof (item as IdeaReferenceLink).url === "string" &&
-      typeof (item as IdeaReferenceLink).label === "string"
-  );
-}
 
 export async function getInitialStudioSnapshot(): Promise<StudioSnapshot> {
   "use cache: private";
@@ -244,10 +233,15 @@ export async function getInitialStudioSnapshot(): Promise<StudioSnapshot> {
 
   const ideas: IdeaListItem[] = rawIdeas.map((idea) => {
     const voters = votesByIdea.get(idea.id) ?? new Set<string>();
+    const resolved = resolveIdeaStatusAndLinks(
+      idea.status,
+      idea.reference_links
+    );
     return {
       ...idea,
+      status: resolved.status,
       content_md: "",
-      reference_links: normalizeLinks(idea.reference_links),
+      reference_links: resolved.links,
       author: idea.created_by ? profileMap.get(idea.created_by) ?? null : null,
       vote_count: voters.size,
       has_voted: voters.has(user.id),

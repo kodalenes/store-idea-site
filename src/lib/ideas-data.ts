@@ -1,12 +1,12 @@
 import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
+import { resolveIdeaStatusAndLinks } from "@/lib/constants";
 import { getRequestAuth, getRequestProfiles } from "@/lib/studio-data";
 import type {
   Attachment,
   Idea,
   IdeaDetail,
   IdeaListItem,
-  IdeaReferenceLink,
   Milestone,
   Profile,
   StudioComment,
@@ -17,17 +17,6 @@ export interface IdeasPageData {
   isConfigured: boolean;
   currentUserId: string | null;
   ideas: IdeaListItem[];
-}
-
-function normalizeLinks(raw: unknown): IdeaReferenceLink[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.filter(
-    (item): item is IdeaReferenceLink =>
-      Boolean(item) &&
-      typeof item === "object" &&
-      typeof (item as IdeaReferenceLink).url === "string" &&
-      typeof (item as IdeaReferenceLink).label === "string"
-  );
 }
 
 export async function getIdeasPageData(): Promise<IdeasPageData> {
@@ -119,10 +108,15 @@ export async function getIdeasPageData(): Promise<IdeasPageData> {
     (ideasRes.data ?? []) as Omit<Idea, "content_md">[]
   ).map((idea) => {
     const voters = votesByIdea.get(idea.id) ?? new Set<string>();
+    const resolved = resolveIdeaStatusAndLinks(
+      idea.status,
+      idea.reference_links
+    );
     return {
       ...idea,
+      status: resolved.status,
       content_md: "",
-      reference_links: normalizeLinks(idea.reference_links),
+      reference_links: resolved.links,
       author: idea.created_by ? profileMap.get(idea.created_by) ?? null : null,
       vote_count: voters.size,
       has_voted: voters.has(user.id),
@@ -218,6 +212,10 @@ export async function getIdeaDetailData(ideaId: string): Promise<{
   }
 
   const rawIdea = ideaRes.data as Idea;
+  const resolvedIdea = resolveIdeaStatusAndLinks(
+    rawIdea.status,
+    rawIdea.reference_links
+  );
   const voterIds = (votesRes.data ?? []).map((v) => v.user_id as string);
   const voterProfiles = voterIds
     .map((id) => profileMap.get(id))
@@ -234,7 +232,8 @@ export async function getIdeaDetailData(ideaId: string): Promise<{
 
   const detail: IdeaDetail = {
     ...rawIdea,
-    reference_links: normalizeLinks(rawIdea.reference_links),
+    status: resolvedIdea.status,
+    reference_links: resolvedIdea.links,
     author: rawIdea.created_by ? profileMap.get(rawIdea.created_by) ?? null : null,
     vote_count: voterIds.length,
     has_voted: voterIds.includes(user.id),

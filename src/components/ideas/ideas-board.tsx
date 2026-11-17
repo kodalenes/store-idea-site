@@ -75,7 +75,8 @@ export function IdeasBoard() {
   // Kanban Drag, Horizontal Pan & Mobile Column State
   const [draggedIdeaId, setDraggedIdeaId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<IdeaStatus | null>(null);
-  const [mobileActiveStage, setMobileActiveStage] = useState<IdeaStatus>("raw");
+  const [mobileActiveStage, setMobileActiveStage] =
+    useState<IdeaStatus>("random");
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
   const panStateRef = useRef<{
     startX: number;
@@ -404,7 +405,7 @@ export function IdeasBoard() {
                 }}
                 className={`${
                   isMobileActive ? "flex" : "hidden md:flex"
-                } max-h-[420px] min-h-[260px] w-full flex-col overflow-hidden rounded-xl border bg-[#0c1018] transition md:h-full md:max-h-none md:min-w-[260px] md:flex-1 ${
+                } max-h-[420px] min-h-[260px] w-full flex-col overflow-hidden rounded-xl border bg-[#0c1018] transition md:h-full md:max-h-none md:w-72 md:shrink-0 ${
                   isDropTarget
                     ? "border-amber-400/70 bg-amber-500/5"
                     : `border-[#1f2735] border-t-2 ${column.accentClass}`
@@ -1098,7 +1099,7 @@ export function IdeasBoard() {
           <button
             type="button"
             disabled={!isConfigured}
-            onClick={() => setCreateStage("raw")}
+            onClick={() => setCreateStage("random")}
             className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-xs font-semibold text-zinc-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus className="h-4 w-4" />
@@ -1235,7 +1236,7 @@ export function IdeasBoard() {
           {isConfigured && (
             <button
               type="button"
-              onClick={() => setCreateStage("raw")}
+              onClick={() => setCreateStage("random")}
               className="mt-5 inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-amber-400"
             >
               <Plus className="h-4 w-4" />

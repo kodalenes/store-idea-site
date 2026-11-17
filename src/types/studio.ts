@@ -7,7 +7,12 @@ export type IdeaCategory =
   | "ui"
   | "system";
 
-export type IdeaStatus = "raw" | "discussing" | "approved" | "shelved";
+export type IdeaStatus =
+  | "random"
+  | "raw"
+  | "discussing"
+  | "approved"
+  | "shelved";
 
 export type TaskKind = "task" | "bug";
 

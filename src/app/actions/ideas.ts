@@ -4,6 +4,10 @@ import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { queueDiscordNotification } from "@/lib/discord";
+import {
+  encodeIdeaStatusForDb,
+  resolveIdeaStatusAndLinks,
+} from "@/lib/constants";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { IdeaCategory, IdeaStatus, TaskPriority } from "@/types/studio";
 
@@ -46,7 +50,7 @@ const ideaPayloadSchema = z.object({
     "ui",
     "system",
   ]),
-  status: z.enum(["raw", "discussing", "approved", "shelved"]),
+  status: z.enum(["random", "raw", "discussing", "approved", "shelved"]),
   reference_links: z.array(referenceLinkSchema).max(12),
 });
 
@@ -95,6 +99,11 @@ export async function createIdeaAction(input: {
     return { ok: false, error: authError ?? "Yetkisiz." };
   }
 
+  const { dbStatus, rawLinks } = encodeIdeaStatusForDb(
+    parsed.data.status,
+    parsed.data.reference_links
+  );
+
   const { data, error } = await supabase
     .from("ideas")
     .insert({
@@ -102,8 +111,8 @@ export async function createIdeaAction(input: {
       summary: parsed.data.summary,
       content_md: parsed.data.content_md,
       category: parsed.data.category,
-      status: parsed.data.status,
-      reference_links: parsed.data.reference_links,
+      status: dbStatus,
+      reference_links: rawLinks,
       created_by: user.id,
     })
     .select("id, created_at")
@@ -154,6 +163,11 @@ export async function updateIdeaAction(
     return { ok: false, error: authError ?? "Yetkisiz." };
   }
 
+  const { dbStatus, rawLinks } = encodeIdeaStatusForDb(
+    parsed.data.status,
+    parsed.data.reference_links
+  );
+
   const { error } = await supabase
     .from("ideas")
     .update({
@@ -161,8 +175,8 @@ export async function updateIdeaAction(
       summary: parsed.data.summary,
       content_md: parsed.data.content_md,
       category: parsed.data.category,
-      status: parsed.data.status,
-      reference_links: parsed.data.reference_links,
+      status: dbStatus,
+      reference_links: rawLinks,
       updated_at: new Date().toISOString(),
     })
     .eq("id", ideaId);
@@ -184,9 +198,25 @@ export async function updateIdeaStatusAction(
     return { ok: false, error: authError ?? "Yetkisiz." };
   }
 
+  const { data: existingIdea } = await supabase
+    .from("ideas")
+    .select("reference_links")
+    .eq("id", ideaId)
+    .maybeSingle();
+
+  const { links } = resolveIdeaStatusAndLinks(
+    status,
+    existingIdea?.reference_links
+  );
+  const { dbStatus, rawLinks } = encodeIdeaStatusForDb(status, links);
+
   const { data: updatedIdea, error } = await supabase
     .from("ideas")
-    .update({ status, updated_at: new Date().toISOString() })
+    .update({
+      status: dbStatus,
+      reference_links: rawLinks,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", ideaId)
     .select("title")
     .single();
