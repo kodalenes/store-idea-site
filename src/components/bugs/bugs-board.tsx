@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   Bug,
@@ -77,6 +77,53 @@ export function BugsBoard() {
   const [bugsViewMode, setBugsViewMode] = useState<"list" | "kanban">("list");
   const [draggedBugId, setDraggedBugId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
+  const boardScrollRef = useRef<HTMLDivElement | null>(null);
+  const panStateRef = useRef<{
+    startX: number;
+    startScrollLeft: number;
+  } | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
+
+  useEffect(() => {
+    if (!isPanning) return;
+
+    function handleWindowMouseMove(e: MouseEvent) {
+      const state = panStateRef.current;
+      const el = boardScrollRef.current;
+      if (!state || !el) return;
+      el.scrollLeft = state.startScrollLeft - (e.clientX - state.startX);
+    }
+
+    function handleWindowMouseUp() {
+      panStateRef.current = null;
+      setIsPanning(false);
+    }
+
+    window.addEventListener("mousemove", handleWindowMouseMove);
+    window.addEventListener("mouseup", handleWindowMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mouseup", handleWindowMouseUp);
+    };
+  }, [isPanning]);
+
+  function handleBoardMouseDown(e: React.MouseEvent<HTMLDivElement>) {
+    if (e.button !== 0 || !boardScrollRef.current) return;
+    const target = e.target as HTMLElement | null;
+    if (
+      target?.closest(
+        "[data-kanban-card], button, select, input, textarea, a, label"
+      )
+    ) {
+      return;
+    }
+
+    panStateRef.current = {
+      startX: e.clientX,
+      startScrollLeft: boardScrollRef.current.scrollLeft,
+    };
+    setIsPanning(true);
+  }
 
   const bugs = useMemo(
     () => tasks.filter((task) => task.kind === "bug"),
@@ -605,7 +652,13 @@ export function BugsBoard() {
 
       {/* Bug List or Bug Kanban */}
       {bugsViewMode === "kanban" ? (
-        <div className="flex flex-col gap-4 pb-2 md:h-[500px] md:flex-row md:overflow-x-auto md:overflow-y-hidden">
+        <div
+          ref={boardScrollRef}
+          onMouseDown={handleBoardMouseDown}
+          className={`flex flex-col gap-4 pb-2 md:h-[500px] md:flex-row md:overflow-x-auto md:overflow-y-hidden ${
+            isPanning ? "md:cursor-grabbing select-none" : "md:cursor-grab"
+          }`}
+        >
           {TASK_STATUSES.map((column) => {
             const colBugs = bugs.filter((b) => {
               if (b.status !== column.value) return false;
@@ -688,6 +741,7 @@ export function BugsBoard() {
                       return (
                         <div
                           key={bug.id}
+                          data-kanban-card="true"
                           draggable={!isPending}
                           onDragStart={() => setDraggedBugId(bug.id)}
                           onDragEnd={() => {
