@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
@@ -30,6 +30,7 @@ import { useStudioStore } from "@/components/studio/studio-store";
 import {
   createIdeaAction,
   toggleIdeaVoteAction,
+  updateIdeaStatusAction,
 } from "@/app/actions/ideas";
 import type { IdeaFormValues } from "@/components/ideas/idea-form-modal";
 import type {
@@ -69,7 +70,59 @@ export function IdeasBoard() {
   const [statusFilter, setStatusFilter] = useState<IdeaStatus | "all">("all");
   const [sortBy, setSortBy] = useState<"recent" | "votes">("recent");
   const [sectionTab, setSectionTab] = useState<IdeaSectionTab>("split");
-  const [createOpen, setCreateOpen] = useState(false);
+  const [createStage, setCreateStage] = useState<IdeaStatus | null>(null);
+
+  // Kanban Drag, Horizontal Pan & Mobile Column State
+  const [draggedIdeaId, setDraggedIdeaId] = useState<string | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<IdeaStatus | null>(null);
+  const [mobileActiveStage, setMobileActiveStage] = useState<IdeaStatus>("raw");
+  const boardScrollRef = useRef<HTMLDivElement | null>(null);
+  const panStateRef = useRef<{
+    startX: number;
+    startScrollLeft: number;
+  } | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
+
+  useEffect(() => {
+    if (!isPanning) return;
+
+    function handleWindowMouseMove(e: MouseEvent) {
+      const state = panStateRef.current;
+      const el = boardScrollRef.current;
+      if (!state || !el) return;
+      el.scrollLeft = state.startScrollLeft - (e.clientX - state.startX);
+    }
+
+    function handleWindowMouseUp() {
+      panStateRef.current = null;
+      setIsPanning(false);
+    }
+
+    window.addEventListener("mousemove", handleWindowMouseMove);
+    window.addEventListener("mouseup", handleWindowMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mouseup", handleWindowMouseUp);
+    };
+  }, [isPanning]);
+
+  function handleBoardMouseDown(e: React.MouseEvent<HTMLDivElement>) {
+    if (e.button !== 0 || !boardScrollRef.current) return;
+    const target = e.target as HTMLElement | null;
+    if (
+      target?.closest(
+        "[data-idea-card], button, select, input, textarea, a, label"
+      )
+    ) {
+      return;
+    }
+
+    panStateRef.current = {
+      startX: e.clientX,
+      startScrollLeft: boardScrollRef.current.scrollLeft,
+    };
+    setIsPanning(true);
+  }
 
   const linkedTasksByIdea = useMemo(() => {
     const map = new Map<string, TaskBoardItem[]>();
@@ -245,7 +298,313 @@ export function IdeasBoard() {
     }
   }
 
-  function renderIdeasCollection(list: IdeaListItem[]) {
+  async function handleMoveIdeaStage(ideaId: string, nextStage: IdeaStatus) {
+    if (ideaId.startsWith("temp-")) return;
+    const prevItem = ideas.find((item) => item.id === ideaId);
+    if (!prevItem || prevItem.status === nextStage) return;
+
+    const prevStatus = prevItem.status;
+    const prevUpdatedAt = prevItem.updated_at;
+    setIdeaError(null);
+
+    setIdeas((prev) =>
+      prev.map((item) =>
+        item.id === ideaId
+          ? { ...item, status: nextStage, updated_at: new Date().toISOString() }
+          : item
+      )
+    );
+
+    try {
+      const res = await updateIdeaStatusAction(ideaId, nextStage);
+      if (!res.ok) {
+        setIdeas((prev) =>
+          prev.map((item) =>
+            item.id === ideaId
+              ? { ...item, status: prevStatus, updated_at: prevUpdatedAt }
+              : item
+          )
+        );
+        setIdeaError(
+          res.error ?? "Fikir aşaması güncellenemedi, değişiklik geri alındı."
+        );
+      }
+    } catch {
+      setIdeas((prev) =>
+        prev.map((item) =>
+          item.id === ideaId
+            ? { ...item, status: prevStatus, updated_at: prevUpdatedAt }
+            : item
+        )
+      );
+      setIdeaError("Bağlantı hatası: Fikir aşaması değişikliği geri alındı.");
+    }
+  }
+
+  function renderIdeaKanban(list: IdeaListItem[], allowColumnCreate: boolean) {
+    return (
+      <div className="space-y-3">
+        {/* Mobile Stage Switcher */}
+        <div className="flex gap-1.5 overflow-x-auto pb-1 md:hidden">
+          {IDEA_STATUSES.map((col) => {
+            const count = list.filter((i) => i.status === col.value).length;
+            const active = mobileActiveStage === col.value;
+            return (
+              <button
+                key={col.value}
+                type="button"
+                onClick={() => setMobileActiveStage(col.value)}
+                className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                  active
+                    ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
+                    : "border-[#1f2735] bg-[#0c1018] text-zinc-400"
+                }`}
+              >
+                {col.label} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 4 Stage Columns (bounded height + column scroll + left-click horizontal pan) */}
+        <div
+          ref={boardScrollRef}
+          onMouseDown={handleBoardMouseDown}
+          className={`flex flex-col gap-4 pb-2 md:h-[490px] md:flex-row md:overflow-x-auto md:overflow-y-hidden xl:h-[520px] ${
+            isPanning ? "md:cursor-grabbing select-none" : "md:cursor-grab"
+          }`}
+        >
+          {IDEA_STATUSES.map((column) => {
+            const colIdeas = list.filter((i) => i.status === column.value);
+            const isDropTarget = dragOverStage === column.value;
+            const isMobileActive = mobileActiveStage === column.value;
+
+            return (
+              <div
+                key={column.value}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (dragOverStage !== column.value) {
+                    setDragOverStage(column.value);
+                  }
+                }}
+                onDragLeave={() => {
+                  if (dragOverStage === column.value) {
+                    setDragOverStage(null);
+                  }
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverStage(null);
+                  if (draggedIdeaId) {
+                    const id = draggedIdeaId;
+                    setDraggedIdeaId(null);
+                    void handleMoveIdeaStage(id, column.value);
+                  }
+                }}
+                className={`${
+                  isMobileActive ? "flex" : "hidden md:flex"
+                } max-h-[420px] min-h-[260px] w-full flex-col overflow-hidden rounded-xl border bg-[#0c1018] transition md:h-full md:max-h-none md:min-w-[260px] md:flex-1 ${
+                  isDropTarget
+                    ? "border-amber-400/70 bg-amber-500/5"
+                    : `border-[#1f2735] border-t-2 ${column.accentClass}`
+                }`}
+              >
+                {/* Column Header */}
+                <div className="flex shrink-0 items-start justify-between gap-2 border-b border-[#1a2130] px-3.5 py-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="truncate text-xs font-semibold tracking-wide text-zinc-100">
+                        {column.label}
+                      </h3>
+                      <span className="rounded-full bg-[#171e2c] px-2 py-0.5 font-mono text-[11px] text-zinc-400">
+                        {colIdeas.length}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 truncate text-[10px] text-zinc-500">
+                      {column.description}
+                    </p>
+                  </div>
+                  {allowColumnCreate && (
+                    <button
+                      type="button"
+                      disabled={!isConfigured}
+                      onClick={() => setCreateStage(column.value)}
+                      className="shrink-0 rounded-md p-1 text-zinc-400 hover:bg-[#171e2c] hover:text-amber-300 disabled:opacity-40"
+                      title={`${column.label} aşamasına fikir ekle`}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Column Cards */}
+                <div className="flex-1 space-y-2.5 overflow-y-auto overscroll-contain p-2.5">
+                  {colIdeas.length === 0 ? (
+                    <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-[#1e2636] text-[11px] text-zinc-600">
+                      Bu aşamada fikir yok
+                    </div>
+                  ) : (
+                    colIdeas.map((idea) => {
+                      const isPending = idea.id.startsWith("temp-");
+                      const catMeta =
+                        IDEA_CATEGORIES.find((c) => c.value === idea.category) ??
+                        IDEA_CATEGORIES[0];
+                      const linkedTasks = linkedTasksByIdea.get(idea.id) ?? [];
+                      const linkedCount = Math.max(
+                        idea.linked_task_count,
+                        linkedTasks.length
+                      );
+
+                      return (
+                        <article
+                          key={idea.id}
+                          data-idea-card="true"
+                          draggable={!isPending}
+                          onDragStart={() => setDraggedIdeaId(idea.id)}
+                          onDragEnd={() => {
+                            setDraggedIdeaId(null);
+                            setDragOverStage(null);
+                          }}
+                          className={`group rounded-xl border border-[#1f2735] bg-[#121722] p-3.5 transition ${
+                            isPending
+                              ? "opacity-75"
+                              : "hover:border-amber-500/50 hover:bg-[#161c29]"
+                          } ${draggedIdeaId === idea.id ? "opacity-50" : ""}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span
+                              className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${catMeta.badgeClass}`}
+                            >
+                              {catMeta.label}
+                            </span>
+
+                            <button
+                              type="button"
+                              disabled={isPending}
+                              onClick={() => handleOptimisticVote(idea.id)}
+                              className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold transition ${
+                                idea.has_voted
+                                  ? "border-amber-500/50 bg-amber-500/20 text-amber-300"
+                                  : "border-[#242e40] bg-[#0b0f17] text-zinc-400 hover:border-amber-500/30 hover:text-zinc-200"
+                              }`}
+                            >
+                              <ThumbsUp className="h-2.5 w-2.5" />
+                              {idea.vote_count}
+                            </button>
+                          </div>
+
+                          {isPending ? (
+                            <span className="mt-2 block text-xs font-semibold text-zinc-200">
+                              {idea.title}{" "}
+                              <span className="text-[10px] font-normal text-amber-300/80">
+                                (Kaydediliyor...)
+                              </span>
+                            </span>
+                          ) : (
+                            <Link
+                              href={`/ideas/${idea.id}`}
+                              className="mt-2 block text-xs font-semibold leading-snug text-zinc-100 transition group-hover:text-amber-300"
+                            >
+                              {idea.title}
+                            </Link>
+                          )}
+
+                          {idea.summary && (
+                            <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-zinc-400">
+                              {idea.summary}
+                            </p>
+                          )}
+
+                          {linkedCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => navigateTab("/tasks")}
+                              className="mt-2 inline-flex items-center gap-1 rounded border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.5 text-[10px] text-cyan-300 hover:bg-cyan-500/20"
+                            >
+                              <KanbanSquare className="h-3 w-3" />
+                              {linkedTasks[0]
+                                ? linkedTasks[0].title.slice(0, 20) +
+                                  (linkedTasks[0].title.length > 20 ? "…" : "")
+                                : `${linkedCount} Görev`}
+                            </button>
+                          )}
+
+                          <div className="mt-3 flex items-center justify-between border-t border-[#1d2534] pt-2 text-[10px] text-zinc-400">
+                            <div className="flex items-center gap-2">
+                              {idea.attachment_count > 0 && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Paperclip className="h-3 w-3 text-zinc-500" />
+                                  {idea.attachment_count}
+                                </span>
+                              )}
+                              <span className="inline-flex items-center gap-1">
+                                <MessageSquare className="h-3 w-3 text-zinc-500" />
+                                {idea.comment_count}
+                              </span>
+                            </div>
+
+                            {idea.author ? (
+                              <span
+                                title={idea.author.display_name}
+                                className="flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-zinc-950"
+                                style={{
+                                  backgroundColor: idea.author.avatar_color,
+                                }}
+                              >
+                                {idea.author.display_name
+                                  .slice(0, 2)
+                                  .toUpperCase()}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-zinc-600">
+                                Ekip
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Mobile quick stage switcher */}
+                          <div className="mt-2 border-t border-[#1a2130] pt-2 md:hidden">
+                            <select
+                              aria-label="Oyun aşaması değiştir"
+                              value={idea.status}
+                              disabled={isPending}
+                              onChange={(e) =>
+                                void handleMoveIdeaStage(
+                                  idea.id,
+                                  e.target.value as IdeaStatus
+                                )
+                              }
+                              className="w-full rounded-md border border-[#242e40] bg-[#080a0f] px-2 py-1 text-[11px] text-zinc-200 focus:border-amber-500/60 focus:outline-none"
+                            >
+                              {IDEA_STATUSES.map((st) => (
+                                <option key={st.value} value={st.value}>
+                                  Aşama: {st.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </article>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  function renderIdeasCollection(
+    list: IdeaListItem[],
+    options?: { forceNonKanban?: boolean; allowColumnCreate?: boolean }
+  ) {
+    if (ideasViewMode === "kanban" && !options?.forceNonKanban) {
+      return renderIdeaKanban(list, options?.allowColumnCreate ?? true);
+    }
+
     if (ideasViewMode === "list") {
       return (
         <div className="divide-y divide-[#182030] overflow-hidden rounded-xl border border-[#1f2735] bg-[#0c1018]">
@@ -468,7 +827,7 @@ export function IdeasBoard() {
       );
     }
 
-    // Default: Detailed Cards View
+    // Detailed Cards View
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {list.map((idea) => {
@@ -671,8 +1030,8 @@ export function IdeasBoard() {
             Fikirler & Mini-GDD Panosu
           </h1>
           <p className="mt-1 text-sm text-zinc-400">
-            Mekanik, hikaye, level ve VFX fikirlerinizi toplayın, oylayın ve
-            göreve dönüştürün; dönüştürülen fikirler aşağıda ayrı takip edilir.
+            Fikirleri oyuna eklenecek aşamaya göre sütunlar arasında
+            sürükleyip bırakın; göreve dönüştürülenler aşağıda ayrı takip edilir.
           </p>
         </div>
 
@@ -682,6 +1041,19 @@ export function IdeasBoard() {
             aria-label="Görünüm Modu"
             className="inline-flex rounded-lg border border-[#242e40] bg-[#0c1018] p-0.5 text-xs"
           >
+            <button
+              type="button"
+              onClick={() => setIdeasViewMode("kanban")}
+              title="Aşama Kanbanı"
+              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
+                ideasViewMode === "kanban"
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              <KanbanSquare className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Kanban</span>
+            </button>
             <button
               type="button"
               onClick={() => setIdeasViewMode("cards")}
@@ -726,7 +1098,7 @@ export function IdeasBoard() {
           <button
             type="button"
             disabled={!isConfigured}
-            onClick={() => setCreateOpen(true)}
+            onClick={() => setCreateStage("raw")}
             className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-xs font-semibold text-zinc-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus className="h-4 w-4" />
@@ -788,36 +1160,38 @@ export function IdeasBoard() {
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-1 rounded-lg border border-[#242e40] bg-[#080a0f] p-0.5">
-            <button
-              type="button"
-              onClick={() => setStatusFilter("all")}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                statusFilter === "all"
-                  ? "bg-amber-500/20 text-amber-300"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              Tümü ({ideas.length})
-            </button>
-            {IDEA_STATUSES.map((st) => {
-              const count = ideas.filter((i) => i.status === st.value).length;
-              return (
-                <button
-                  key={st.value}
-                  type="button"
-                  onClick={() => setStatusFilter(st.value)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                    statusFilter === st.value
-                      ? "bg-amber-500/20 text-amber-300"
-                      : "text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  {st.label} ({count})
-                </button>
-              );
-            })}
-          </div>
+          {ideasViewMode !== "kanban" && (
+            <div className="flex flex-wrap items-center gap-1 rounded-lg border border-[#242e40] bg-[#080a0f] p-0.5">
+              <button
+                type="button"
+                onClick={() => setStatusFilter("all")}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                  statusFilter === "all"
+                    ? "bg-amber-500/20 text-amber-300"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                Tümü ({ideas.length})
+              </button>
+              {IDEA_STATUSES.map((st) => {
+                const count = ideas.filter((i) => i.status === st.value).length;
+                return (
+                  <button
+                    key={st.value}
+                    type="button"
+                    onClick={() => setStatusFilter(st.value)}
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                      statusFilter === st.value
+                        ? "bg-amber-500/20 text-amber-300"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    {st.label} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           <select
             value={categoryFilter}
@@ -856,12 +1230,12 @@ export function IdeasBoard() {
           </h3>
           <p className="mt-1 max-w-md text-xs text-zinc-400">
             Aklınıza gelen ilk oyun mekaniğini, level fikrini veya görsel
-            referansı ekleyerek ekibin GDD hafızasını başlatın.
+            referansı ekleyerek aşama kanbanınızı başlatın.
           </p>
           {isConfigured && (
             <button
               type="button"
-              onClick={() => setCreateOpen(true)}
+              onClick={() => setCreateStage("raw")}
               className="mt-5 inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-amber-400"
             >
               <Plus className="h-4 w-4" />
@@ -878,7 +1252,7 @@ export function IdeasBoard() {
                 <div className="flex items-center gap-2">
                   <Lightbulb className="h-4 w-4 text-amber-400" />
                   <h2 className="text-sm font-semibold text-zinc-100">
-                    Fikir Havuzu & Aktif GDD
+                    Fikir Havuzu & Oyun Aşamaları
                   </h2>
                   <span className="rounded-full bg-[#182030] px-2 py-0.5 font-mono text-[11px] text-zinc-300">
                     {activeIdeas.length}
@@ -886,14 +1260,14 @@ export function IdeasBoard() {
                 </div>
               </div>
 
-              {activeIdeas.length === 0 ? (
+              {activeIdeas.length === 0 && ideasViewMode !== "kanban" ? (
                 <div className="rounded-xl border border-dashed border-[#242e40] bg-[#0c1018] px-6 py-10 text-center text-xs text-zinc-400">
                   {totalActiveCount === 0
                     ? "Tüm fikirler göreve dönüştürülmüş! Aşağıdaki veya Göreve Dönüştürülenler sekmesindeki listeden takip edebilirsiniz."
                     : "Filtrelere uyan aktif fikir bulunamadı."}
                 </div>
               ) : (
-                renderIdeasCollection(activeIdeas)
+                renderIdeasCollection(activeIdeas, { allowColumnCreate: true })
               )}
             </section>
           )}
@@ -939,19 +1313,33 @@ export function IdeasBoard() {
                     : "Filtrelere uyan dönüştürülmüş fikir bulunamadı."}
                 </div>
               ) : (
-                renderIdeasCollection(convertedIdeas)
+                renderIdeasCollection(convertedIdeas, {
+                  forceNonKanban: sectionTab === "split",
+                  allowColumnCreate: false,
+                })
               )}
             </section>
           )}
         </div>
       )}
 
-      <IdeaFormModal
-        open={createOpen}
-        mode="create"
-        onClose={() => setCreateOpen(false)}
-        onSubmit={handleCreateIdea}
-      />
+      {createStage && (
+        <IdeaFormModal
+          key={createStage}
+          open
+          mode="create"
+          initialValues={{
+            title: "",
+            summary: "",
+            content_md: "",
+            category: "mechanic",
+            status: createStage,
+            reference_links: [],
+          }}
+          onClose={() => setCreateStage(null)}
+          onSubmit={handleCreateIdea}
+        />
+      )}
     </div>
   );
 }

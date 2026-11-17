@@ -33,7 +33,7 @@ export type StudioTabPath =
   | "/settings";
 
 export type TaskBoardViewMode = "kanban" | "compact" | "list";
-export type IdeaBoardViewMode = "cards" | "compact" | "list";
+export type IdeaBoardViewMode = "kanban" | "cards" | "compact" | "list";
 
 function isTaskBoardViewMode(
   value: string | null
@@ -44,7 +44,12 @@ function isTaskBoardViewMode(
 function isIdeaBoardViewMode(
   value: string | null
 ): value is IdeaBoardViewMode {
-  return value === "cards" || value === "compact" || value === "list";
+  return (
+    value === "kanban" ||
+    value === "cards" ||
+    value === "compact" ||
+    value === "list"
+  );
 }
 
 const STUDIO_TAB_SET = new Set<string>([
@@ -167,7 +172,7 @@ const DEFAULT_DRIVE_FOLDER_ID = "1_eG_uHfIqArDnBMCAR_0ExyM8pcefctH";
   const [tasksViewMode, setTasksViewModeState] =
     useState<TaskBoardViewMode>("kanban");
   const [ideasViewMode, setIdeasViewModeState] =
-    useState<IdeaBoardViewMode>("cards");
+    useState<IdeaBoardViewMode>("kanban");
 
   const setIdeasViewMode: Dispatch<SetStateAction<IdeaBoardViewMode>> =
     useCallback((next) => {

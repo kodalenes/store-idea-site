@@ -197,8 +197,8 @@ export async function updateIdeaStatusAction(
 
   if (status === "approved" && updatedIdea) {
     queueDiscordNotification({
-      title: `✨ Fikir Onaylandı: ${updatedIdea.title}`,
-      description: "Ekip bu fikri oyuna eklemek üzere onayladı!",
+      title: `✨ Fikir Tam Sürüm Hedefine Alındı: ${updatedIdea.title}`,
+      description: "Ekip bu fikri çıkış sürümü (v1.0) kapsamına ekledi!",
       color: 0x10b981,
     });
   }

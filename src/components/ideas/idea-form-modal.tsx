@@ -170,7 +170,7 @@ export function IdeaFormModal({
 
             <div className="space-y-1.5">
               <label className="block text-xs font-medium text-zinc-300">
-                Durum
+                Ekleneceği Oyun Aşaması
               </label>
               <select
                 value={status}

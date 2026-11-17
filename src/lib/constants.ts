@@ -66,27 +66,37 @@ export const IDEA_CATEGORIES: {
 export const IDEA_STATUSES: {
   value: IdeaStatus;
   label: string;
+  description: string;
+  accentClass: string;
   badgeClass: string;
 }[] = [
   {
     value: "raw",
-    label: "Ham Fikir",
-    badgeClass: "bg-zinc-500/15 text-zinc-300 border-zinc-500/30",
-  },
-  {
-    value: "discussing",
-    label: "Tartışılıyor",
+    label: "Prototip / Çekirdek",
+    description: "İlk prototipte hemen denenebilir",
+    accentClass: "border-amber-500/40",
     badgeClass: "bg-amber-500/15 text-amber-300 border-amber-500/30",
   },
   {
+    value: "discussing",
+    label: "Erken Geliştirme / Alpha",
+    description: "Ana mekanikler kurulurken eklenecek",
+    accentClass: "border-sky-500/40",
+    badgeClass: "bg-sky-500/15 text-sky-300 border-sky-500/30",
+  },
+  {
     value: "approved",
-    label: "Onaylandı",
+    label: "Tam Sürüm / Çıkış",
+    description: "Demo veya v1.0 çıkışına kadar hedef",
+    accentClass: "border-emerald-500/40",
     badgeClass: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
   },
   {
     value: "shelved",
-    label: "Rafa Kaldırıldı",
-    badgeClass: "bg-slate-500/15 text-slate-400 border-slate-500/30",
+    label: "Çıkış Sonrası / DLC",
+    description: "v1.0 sonrası güncelleme veya DLC",
+    accentClass: "border-purple-500/40",
+    badgeClass: "bg-purple-500/15 text-purple-300 border-purple-500/30",
   },
 ];
 
