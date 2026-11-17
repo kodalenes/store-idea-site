@@ -119,7 +119,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const activeColor = currentProfile?.avatar_color ?? "#f59e0b";
 
   return (
-    <div className="flex min-h-screen bg-[#080a0f] text-[#e6ebf5]">
+    <div className="flex min-h-screen bg-[#0c1017] text-[#edf2f8]">
       {/* Mobile backdrop */}
       {mobileMenuOpen && (
         <div
@@ -130,7 +130,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Left Studio Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex h-dvh w-64 flex-col border-r border-[#1f2735] bg-[#0c1018] transition-transform duration-200 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex h-dvh w-64 flex-col border-r border-[#243044] bg-[#101622] transition-transform duration-200 lg:translate-x-0 ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -149,7 +149,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <p className="truncate text-sm font-semibold text-zinc-100">
                 {workspace.project_name}
               </p>
-              <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+              <div className="flex items-center gap-1.5 text-xs text-zinc-400">
                 <span className="truncate">{workspace.studio_name}</span>
                 <span>•</span>
                 <span className="font-mono text-amber-400">
@@ -172,7 +172,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <Bell className="h-4.5 w-4.5" />
               {unreadDriveCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-cyan-500 px-1 text-[9px] font-bold text-zinc-950">
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-cyan-500 px-1 text-xs font-bold text-zinc-950">
                   {unreadDriveCount > 9 ? "9+" : unreadDriveCount}
                 </span>
               )}
@@ -223,7 +223,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="space-y-2.5 border-t border-[#1f2735] p-3">
           {teamProfiles.length > 0 && (
             <div className="flex items-center justify-between rounded-lg bg-[#101520] px-3 py-2">
-              <span className="text-[11px] font-medium text-zinc-400">
+              <span className="text-xs font-medium text-zinc-400">
                 Ekip ({teamProfiles.length}/3)
               </span>
               <div className="flex -space-x-1.5">
@@ -231,7 +231,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <span
                     key={member.id}
                     title={`${member.display_name} — ${member.role_title}`}
-                    className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#101520] text-[9px] font-bold text-zinc-950"
+                    className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#101520] text-xs font-bold text-zinc-950"
                     style={{ backgroundColor: member.avatar_color }}
                   >
                     {member.display_name.slice(0, 2).toUpperCase()}
@@ -253,7 +253,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <p className="truncate text-xs font-semibold text-zinc-100">
                   {activeName}
                 </p>
-                <p className="truncate text-[11px] text-zinc-400">
+                <p className="truncate text-xs text-zinc-400">
                   {activeRole}
                 </p>
               </div>
@@ -287,7 +287,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               ) : (
                 <Link
                   href="/login"
-                  className="rounded-md bg-amber-500/15 px-2 py-1 text-[11px] font-medium text-amber-300 hover:bg-amber-500/25"
+                  className="rounded-md bg-amber-500/15 px-2 py-1 text-xs font-medium text-amber-300 hover:bg-amber-500/25"
                 >
                   Giriş
                 </Link>
@@ -329,7 +329,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <Bell className="h-4.5 w-4.5" />
               {unreadDriveCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-cyan-500 px-1 text-[9px] font-bold text-zinc-950">
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-cyan-500 px-1 text-xs font-bold text-zinc-950">
                   {unreadDriveCount > 9 ? "9+" : unreadDriveCount}
                 </span>
               )}
@@ -359,7 +359,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                         type="button"
                         onClick={markDriveNotificationsRead}
                         title="Tümünü Okundu İşaretle"
-                        className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+                        className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
                       >
                         <Check className="h-3 w-3" />
                         Okundu
@@ -370,7 +370,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                           void handleClearDriveNotifications();
                         }}
                         title="Geçmişi Temizle"
-                        className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-rose-300/80 hover:bg-rose-500/15 hover:text-rose-200"
+                        className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-rose-300/80 hover:bg-rose-500/15 hover:text-rose-200"
                       >
                         <Trash2 className="h-3 w-3" />
                         Temizle
@@ -398,7 +398,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                         setNotificationsOpen(false);
                         navigateTab("/settings");
                       }}
-                      className="mt-2.5 inline-flex items-center gap-1 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-medium text-cyan-300 hover:bg-cyan-500/20"
+                      className="mt-2.5 inline-flex items-center gap-1 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20"
                     >
                       Drive Bağlantısını Ayarla →
                     </button>
@@ -414,7 +414,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span
-                              className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                              className={`rounded px-1.5 py-0.5 text-[12px] font-medium ${
                                 ev.event_type === "updated"
                                   ? "bg-amber-500/15 text-amber-300"
                                   : "bg-cyan-500/15 text-cyan-300"
@@ -424,11 +424,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                                 ? "Güncellendi"
                                 : "Yeni"}
                             </span>
-                            <span className="truncate rounded bg-[#182030] px-1.5 py-0.5 text-[10px] text-zinc-300">
+                            <span className="truncate rounded bg-[#182030] px-1.5 py-0.5 text-[12px] text-zinc-300">
                               {ev.folder_name}
                             </span>
                             {sizeLabel && (
-                              <span className="text-[10px] text-zinc-500">
+                              <span className="text-[12px] text-zinc-500">
                                 {sizeLabel}
                               </span>
                             )}
@@ -436,7 +436,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                           <p className="mt-1 truncate text-xs font-semibold text-zinc-100">
                             {ev.file_name}
                           </p>
-                          <p className="mt-0.5 text-[11px] text-zinc-400">
+                          <p className="mt-0.5 text-xs text-zinc-400">
                             {ev.uploaded_by_name}
                           </p>
                         </div>
@@ -448,7 +448,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="mt-1 inline-flex shrink-0 items-center gap-1 rounded-md border border-[#242e40] bg-[#0a0e15] px-2 py-1 text-[11px] font-medium text-cyan-300 hover:border-cyan-500/40"
+                          className="mt-1 inline-flex shrink-0 items-center gap-1 rounded-md border border-[#242e40] bg-[#0a0e15] px-2 py-1 text-xs font-medium text-cyan-300 hover:border-cyan-500/40"
                         >
                           Aç
                           <ExternalLink className="h-3 w-3" />

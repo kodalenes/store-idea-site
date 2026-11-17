@@ -236,12 +236,12 @@ export function DashboardView() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         {task.kind === "bug" && (
-                          <span className="rounded bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-rose-300">
+                          <span className="rounded bg-rose-500/20 px-1.5 py-0.5 text-[12px] font-semibold text-rose-300">
                             Bug
                           </span>
                         )}
                         <span
-                          className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${priorityMeta.badgeClass}`}
+                          className={`rounded border px-1.5 py-0.5 text-[12px] font-medium ${priorityMeta.badgeClass}`}
                         >
                           {priorityMeta.label}
                         </span>
@@ -250,7 +250,7 @@ export function DashboardView() {
                         {task.title}
                       </p>
                     </div>
-                    <span className="shrink-0 rounded-md bg-[#151b26] px-2 py-1 text-[11px] text-zinc-300">
+                    <span className="shrink-0 rounded-md bg-[#151b26] px-2 py-1 text-xs text-zinc-300">
                       {statusLabel}
                     </span>
                   </button>
@@ -358,12 +358,12 @@ export function DashboardView() {
                       </p>
                       <div className="flex shrink-0 items-center gap-1.5">
                         <span
-                          className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${catMeta.badgeClass}`}
+                          className={`rounded-full border px-2 py-0.5 text-[12px] font-medium ${catMeta.badgeClass}`}
                         >
                           {catMeta.label}
                         </span>
                         <span
-                          className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusMeta.badgeClass}`}
+                          className={`rounded-full border px-2 py-0.5 text-[12px] font-medium ${statusMeta.badgeClass}`}
                         >
                           {statusMeta.label}
                         </span>
@@ -415,11 +415,11 @@ export function DashboardView() {
                       <p className="truncate text-xs font-medium text-zinc-100">
                         {ev.file_name}
                       </p>
-                      <p className="truncate text-[11px] text-zinc-400">
+                      <p className="truncate text-xs text-zinc-400">
                         {ev.folder_name} • {ev.uploaded_by_name}
                       </p>
                     </div>
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300">
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[12px] font-medium text-cyan-300">
                       {ev.event_type === "updated" ? "Güncel" : "Yeni"}
                       <ExternalLink className="h-2.5 w-2.5" />
                     </span>

@@ -423,7 +423,7 @@ const DEFAULT_DRIVE_FOLDER_ID = "1_eG_uHfIqArDnBMCAR_0ExyM8pcefctH";
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-cyan-300">
+                <span className="text-xs font-semibold uppercase tracking-wide text-cyan-300">
                   {liveDriveToast.event_type === "updated"
                     ? "Drive Asset Güncellendi"
                     : "Yeni Drive Asset"}
@@ -440,7 +440,7 @@ const DEFAULT_DRIVE_FOLDER_ID = "1_eG_uHfIqArDnBMCAR_0ExyM8pcefctH";
               <p className="mt-0.5 truncate text-xs font-semibold text-zinc-100">
                 {liveDriveToast.file_name}
               </p>
-              <p className="mt-0.5 truncate text-[11px] text-zinc-400">
+              <p className="mt-0.5 truncate text-xs text-zinc-400">
                 {liveDriveToast.folder_name} • {liveDriveToast.uploaded_by_name}
               </p>
               <a
@@ -451,7 +451,7 @@ const DEFAULT_DRIVE_FOLDER_ID = "1_eG_uHfIqArDnBMCAR_0ExyM8pcefctH";
                 }
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-amber-300 hover:text-amber-200"
+                className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-amber-300 hover:text-amber-200"
               >
                 Google Drive&apos;da Aç
                 <ExternalLink className="h-3 w-3" />

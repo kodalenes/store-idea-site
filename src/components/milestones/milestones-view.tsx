@@ -969,7 +969,7 @@ export function MilestonesView() {
 
           {/* Phase & Status Filter Pills */}
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#1a2232] pt-3">
-            <div className="flex flex-wrap items-center gap-1 text-[11px]">
+            <div className="flex flex-wrap items-center gap-1 text-xs">
               <button
                 type="button"
                 onClick={() => setPhaseFilter("all")}
@@ -1001,7 +1001,7 @@ export function MilestonesView() {
               })}
             </div>
 
-            <div className="flex items-center gap-1 rounded-lg border border-[#242e40] bg-[#080a0f] p-0.5 text-[11px]">
+            <div className="flex items-center gap-1 rounded-lg border border-[#242e40] bg-[#080a0f] p-0.5 text-xs">
               <button
                 type="button"
                 onClick={() => setStatusFilter("all")}
@@ -1087,14 +1087,14 @@ export function MilestonesView() {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full border border-violet-500/40 bg-violet-500/15 px-2.5 py-0.5 text-[11px] font-medium text-violet-300">
+                      <span className="rounded-full border border-violet-500/40 bg-violet-500/15 px-2.5 py-0.5 text-xs font-medium text-violet-300">
                         {m.phase}
                       </span>
-                      <span className="rounded-full border border-cyan-500/35 bg-cyan-500/10 px-2.5 py-0.5 text-[11px] font-medium text-cyan-300">
+                      <span className="rounded-full border border-cyan-500/35 bg-cyan-500/10 px-2.5 py-0.5 text-xs font-medium text-cyan-300">
                         {m.category}
                       </span>
                       <span
-                        className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${statusMeta.badgeClass}`}
+                        className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusMeta.badgeClass}`}
                       >
                         {statusMeta.label}
                       </span>
@@ -1361,7 +1361,7 @@ export function MilestonesView() {
                                       e.target.value as TaskStatus
                                     )
                                   }
-                                  className="rounded-md border border-[#242e40] bg-[#080a0f] px-2 py-1 text-[11px] font-medium text-zinc-200 focus:border-amber-500/60 focus:outline-none disabled:opacity-50"
+                                  className="rounded-md border border-[#242e40] bg-[#080a0f] px-2 py-1 text-xs font-medium text-zinc-200 focus:border-amber-500/60 focus:outline-none disabled:opacity-50"
                                 >
                                   {TASK_STATUSES.map((s) => (
                                     <option key={s.value} value={s.value}>
@@ -1372,7 +1372,7 @@ export function MilestonesView() {
                               </div>
 
                               <span
-                                className={`hidden w-14 shrink-0 rounded border px-1.5 py-0.5 text-center text-[10px] font-medium sm:inline-block ${priorityMeta.badgeClass}`}
+                                className={`hidden w-14 shrink-0 rounded border px-1.5 py-0.5 text-center text-[12px] font-medium sm:inline-block ${priorityMeta.badgeClass}`}
                               >
                                 {priorityMeta.label}
                               </span>
@@ -1387,20 +1387,20 @@ export function MilestonesView() {
                               <span className="min-w-0 flex-1 truncate font-medium text-zinc-200">
                                 {task.title}
                                 {isPending && (
-                                  <span className="ml-2 text-[10px] font-normal text-amber-300/80">
+                                  <span className="ml-2 text-[12px] font-normal text-amber-300/80">
                                     (Kaydediliyor...)
                                   </span>
                                 )}
                               </span>
 
                               {task.ue_tags[0] && (
-                                <span className="hidden rounded bg-[#151c29] px-1.5 py-0.5 text-[10px] text-zinc-400 md:inline">
+                                <span className="hidden rounded bg-[#151c29] px-1.5 py-0.5 text-[12px] text-zinc-400 md:inline">
                                   {task.ue_tags[0]}
                                 </span>
                               )}
 
                               {task.subtasks.length > 0 && (
-                                <span className="hidden items-center gap-1 text-[11px] text-zinc-400 sm:inline-flex">
+                                <span className="hidden items-center gap-1 text-xs text-zinc-400 sm:inline-flex">
                                   <CheckSquare className="h-3 w-3 text-emerald-400" />
                                   {doneSubs}/{task.subtasks.length}
                                 </span>
@@ -1409,7 +1409,7 @@ export function MilestonesView() {
                               {assignee ? (
                                 <span
                                   title={assignee.display_name}
-                                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-zinc-950"
+                                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold text-zinc-950"
                                   style={{
                                     backgroundColor: assignee.avatar_color,
                                   }}
@@ -1419,7 +1419,7 @@ export function MilestonesView() {
                                     .toUpperCase()}
                                 </span>
                               ) : (
-                                <span className="shrink-0 text-[10px] text-zinc-600">
+                                <span className="shrink-0 text-[12px] text-zinc-600">
                                   Boşta
                                 </span>
                               )}

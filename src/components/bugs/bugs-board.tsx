@@ -719,7 +719,7 @@ export function BugsBoard() {
                     <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-200">
                       {column.label}
                     </h2>
-                    <span className="rounded-full bg-[#171e2c] px-2 py-0.5 font-mono text-[11px] text-zinc-400">
+                    <span className="rounded-full bg-[#171e2c] px-2 py-0.5 font-mono text-xs text-zinc-400">
                       {colBugs.length}
                     </span>
                   </div>
@@ -727,7 +727,7 @@ export function BugsBoard() {
 
                 <div className="flex-1 space-y-2 overflow-y-auto overscroll-contain p-2.5">
                   {colBugs.length === 0 ? (
-                    <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-[#1e2636] text-[11px] text-zinc-600">
+                    <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-[#1e2636] text-xs text-zinc-600">
                       Bug yok
                     </div>
                   ) : (
@@ -759,7 +759,7 @@ export function BugsBoard() {
                         >
                           <div className="flex flex-wrap items-center justify-between gap-1.5">
                             <span
-                              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${SEVERITY_BADGES[sev]}`}
+                              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[12px] font-semibold ${SEVERITY_BADGES[sev]}`}
                             >
                               {sev === "crash" ? (
                                 <AlertTriangle className="h-2.5 w-2.5" />
@@ -769,7 +769,7 @@ export function BugsBoard() {
                               {sevLabel}
                             </span>
                             {bug.build_version && (
-                              <span className="rounded bg-[#080a0f] px-1.5 py-0.5 font-mono text-[10px] text-cyan-300">
+                              <span className="rounded bg-[#080a0f] px-1.5 py-0.5 font-mono text-[12px] text-cyan-300">
                                 {bug.build_version}
                               </span>
                             )}
@@ -777,14 +777,14 @@ export function BugsBoard() {
                           <h3 className="mt-2 text-xs font-semibold leading-snug text-zinc-100">
                             {bug.title}
                           </h3>
-                          <div className="mt-2.5 flex items-center justify-between border-t border-[#1d2534] pt-2 text-[10px] text-zinc-400">
+                          <div className="mt-2.5 flex items-center justify-between border-t border-[#1d2534] pt-2 text-[12px] text-zinc-400">
                             <span>
                               {bug.reporter?.display_name ?? "Ekip"}
                             </span>
                             {bug.assignee && (
                               <span
                                 title={bug.assignee.display_name}
-                                className="flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-zinc-950"
+                                className="flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold text-zinc-950"
                                 style={{
                                   backgroundColor: bug.assignee.avatar_color,
                                 }}
@@ -847,7 +847,7 @@ export function BugsBoard() {
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
                       <span
-                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${SEVERITY_BADGES[sev]}`}
+                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[12px] font-semibold ${SEVERITY_BADGES[sev]}`}
                       >
                         {sev === "crash" ? (
                           <AlertTriangle className="h-3 w-3" />
@@ -857,12 +857,12 @@ export function BugsBoard() {
                         {sevLabel}
                       </span>
                       <span
-                        className={`rounded border px-2 py-0.5 text-[10px] font-medium ${priorityMeta.badgeClass}`}
+                        className={`rounded border px-2 py-0.5 text-[12px] font-medium ${priorityMeta.badgeClass}`}
                       >
                         {priorityMeta.label}
                       </span>
                       {bug.build_version && (
-                        <span className="rounded bg-[#080a0f] px-2 py-0.5 font-mono text-[10px] text-cyan-300">
+                        <span className="rounded bg-[#080a0f] px-2 py-0.5 font-mono text-[12px] text-cyan-300">
                           {bug.build_version}
                         </span>
                       )}
@@ -871,7 +871,7 @@ export function BugsBoard() {
                     <h3 className="text-sm font-semibold text-zinc-100">
                       {bug.title}
                       {isPending && (
-                        <span className="ml-2 text-[11px] font-normal text-amber-300/80">
+                        <span className="ml-2 text-xs font-normal text-amber-300/80">
                           (Kaydediliyor...)
                         </span>
                       )}
@@ -909,7 +909,7 @@ export function BugsBoard() {
                   </div>
                 </div>
 
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#1b2230] pt-2.5 text-[11px] text-zinc-400">
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#1b2230] pt-2.5 text-xs text-zinc-400">
                   <div className="flex flex-wrap items-center gap-3">
                     <span>
                       Bildiren:{" "}
@@ -935,7 +935,7 @@ export function BugsBoard() {
                     {bug.assignee ? (
                       <span className="inline-flex items-center gap-1.5 text-zinc-200">
                         <span
-                          className="flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-zinc-950"
+                          className="flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold text-zinc-950"
                           style={{ backgroundColor: bug.assignee.avatar_color }}
                         >
                           {bug.assignee.display_name.slice(0, 2).toUpperCase()}
@@ -1131,7 +1131,7 @@ export function BugsBoard() {
                               : [...prev, tag]
                           )
                         }
-                        className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
+                        className={`rounded-full border px-2.5 py-1 text-xs font-medium transition ${
                           active
                             ? "border-rose-500/50 bg-rose-500/20 text-rose-200"
                             : "border-[#242e40] bg-[#080a0f] text-zinc-400 hover:text-zinc-200"
@@ -1152,7 +1152,7 @@ export function BugsBoard() {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="inline-flex items-center gap-1 rounded-lg border border-[#242e40] bg-[#151b26] px-2.5 py-1 text-[11px] text-zinc-200 hover:border-rose-500/40"
+                    className="inline-flex items-center gap-1 rounded-lg border border-[#242e40] bg-[#151b26] px-2.5 py-1 text-xs text-zinc-200 hover:border-rose-500/40"
                   >
                     <Upload className="h-3 w-3" />
                     Dosya Seç
@@ -1176,7 +1176,7 @@ export function BugsBoard() {
                     {pendingFiles.map((f, idx) => (
                       <span
                         key={`${f.name}-${idx}`}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-[#242e40] bg-[#080a0f] px-2.5 py-1 text-[11px] text-zinc-300"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-[#242e40] bg-[#080a0f] px-2.5 py-1 text-xs text-zinc-300"
                       >
                         {f.name}
                         <button

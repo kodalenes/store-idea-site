@@ -751,7 +751,7 @@ export function KanbanBoard() {
                               e.target.value as TaskStatus
                             )
                           }
-                          className="rounded-md border border-[#242e40] bg-[#080a0f] px-2 py-1 text-[11px] font-medium text-zinc-200 focus:border-amber-500/60 focus:outline-none disabled:opacity-50"
+                          className="rounded-md border border-[#242e40] bg-[#080a0f] px-2 py-1 text-xs font-medium text-zinc-200 focus:border-amber-500/60 focus:outline-none disabled:opacity-50"
                         >
                           {TASK_STATUSES.map((s) => (
                             <option key={s.value} value={s.value}>
@@ -762,13 +762,13 @@ export function KanbanBoard() {
                       </div>
 
                       <span
-                        className={`w-14 shrink-0 rounded border px-1.5 py-0.5 text-center text-[10px] font-medium ${priorityMeta.badgeClass}`}
+                        className={`w-14 shrink-0 rounded border px-1.5 py-0.5 text-center text-[12px] font-medium ${priorityMeta.badgeClass}`}
                       >
                         {priorityMeta.label}
                       </span>
 
                       {task.kind === "bug" && (
-                        <span className="hidden shrink-0 items-center gap-1 rounded bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-rose-300 sm:inline-flex">
+                        <span className="hidden shrink-0 items-center gap-1 rounded bg-rose-500/20 px-1.5 py-0.5 text-[12px] font-semibold text-rose-300 sm:inline-flex">
                           <Bug className="h-3 w-3" />
                           Bug
                         </span>
@@ -777,7 +777,7 @@ export function KanbanBoard() {
                       <span className="min-w-0 flex-1 truncate font-medium text-zinc-100">
                         {task.title}
                         {isPending && (
-                          <span className="ml-2 text-[10px] font-normal text-amber-300/80">
+                          <span className="ml-2 text-[12px] font-normal text-amber-300/80">
                             (Kaydediliyor...)
                           </span>
                         )}
@@ -786,7 +786,7 @@ export function KanbanBoard() {
                       {isBlocked && (
                         <span
                           title={`Bekliyor: ${task.blocked_by_task?.title}`}
-                          className="hidden shrink-0 items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-200 md:inline-flex"
+                          className="hidden shrink-0 items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[12px] text-amber-200 md:inline-flex"
                         >
                           <AlertTriangle className="h-3 w-3 text-amber-400" />
                           Bekliyor
@@ -794,7 +794,7 @@ export function KanbanBoard() {
                       )}
 
                       {task.milestone && (
-                        <span className="hidden max-w-36 shrink-0 items-center gap-1 truncate rounded bg-[#141c2b] px-2 py-0.5 text-[10px] text-cyan-300 sm:inline-flex">
+                        <span className="hidden max-w-36 shrink-0 items-center gap-1 truncate rounded bg-[#141c2b] px-2 py-0.5 text-[12px] text-cyan-300 sm:inline-flex">
                           <Flag className="h-2.5 w-2.5 shrink-0" />
                           <span className="truncate">
                             {task.milestone.title}
@@ -807,20 +807,20 @@ export function KanbanBoard() {
                           {task.ue_tags.slice(0, 2).map((tag) => (
                             <span
                               key={tag}
-                              className="rounded bg-[#1b2232] px-1.5 py-0.5 text-[10px] text-zinc-300"
+                              className="rounded bg-[#1b2232] px-1.5 py-0.5 text-[12px] text-zinc-300"
                             >
                               {tag}
                             </span>
                           ))}
                           {task.ue_tags.length > 2 && (
-                            <span className="rounded bg-[#1b2232] px-1.5 py-0.5 text-[10px] text-zinc-400">
+                            <span className="rounded bg-[#1b2232] px-1.5 py-0.5 text-[12px] text-zinc-400">
                               +{task.ue_tags.length - 2}
                             </span>
                           )}
                         </div>
                       )}
 
-                      <div className="hidden shrink-0 items-center gap-2 text-[11px] text-zinc-400 md:flex">
+                      <div className="hidden shrink-0 items-center gap-2 text-xs text-zinc-400 md:flex">
                         {task.subtasks.length > 0 && (
                           <span className="inline-flex items-center gap-1">
                             <CheckSquare className="h-3 w-3 text-emerald-400" />
@@ -840,7 +840,7 @@ export function KanbanBoard() {
                           <>
                             <span
                               title={task.assignee.display_name}
-                              className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-zinc-950"
+                              className="flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold text-zinc-950"
                               style={{
                                 backgroundColor: task.assignee.avatar_color,
                               }}
@@ -849,12 +849,12 @@ export function KanbanBoard() {
                                 .slice(0, 2)
                                 .toUpperCase()}
                             </span>
-                            <span className="hidden max-w-20 truncate text-[11px] text-zinc-300 xl:inline">
+                            <span className="hidden max-w-20 truncate text-xs text-zinc-300 xl:inline">
                               {task.assignee.display_name}
                             </span>
                           </>
                         ) : (
-                          <span className="text-[10px] text-zinc-600">
+                          <span className="text-[12px] text-zinc-600">
                             Boşta
                           </span>
                         )}
@@ -939,7 +939,7 @@ export function KanbanBoard() {
                       <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-200">
                         {column.label}
                       </h2>
-                      <span className="rounded-full bg-[#171e2c] px-2 py-0.5 font-mono text-[11px] text-zinc-400">
+                      <span className="rounded-full bg-[#171e2c] px-2 py-0.5 font-mono text-xs text-zinc-400">
                         {columnTasks.length}
                       </span>
                     </div>
@@ -963,7 +963,7 @@ export function KanbanBoard() {
                     }`}
                   >
                     {columnTasks.length === 0 ? (
-                      <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-[#1e2636] text-[11px] text-zinc-600">
+                      <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-[#1e2636] text-xs text-zinc-600">
                         Kart yok
                       </div>
                     ) : (
@@ -1025,14 +1025,14 @@ export function KanbanBoard() {
                                   {task.title}
                                 </h3>
                                 {task.subtasks.length > 0 && (
-                                  <span className="shrink-0 font-mono text-[10px] text-zinc-400">
+                                  <span className="shrink-0 font-mono text-[12px] text-zinc-400">
                                     {doneSubtasks}/{task.subtasks.length}
                                   </span>
                                 )}
                                 {task.assignee && (
                                   <span
                                     title={task.assignee.display_name}
-                                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-zinc-950"
+                                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold text-zinc-950"
                                     style={{
                                       backgroundColor:
                                         task.assignee.avatar_color,
@@ -1048,14 +1048,14 @@ export function KanbanBoard() {
                               {(task.milestone ||
                                 task.ue_tags.length > 0 ||
                                 isPending) && (
-                                <div className="mt-1 flex items-center gap-1.5 truncate pl-4 text-[10px] text-zinc-500">
+                                <div className="mt-1 flex items-center gap-1.5 truncate pl-4 text-[12px] text-zinc-500">
                                   {task.milestone && (
                                     <span className="truncate text-cyan-400/90">
                                       {task.milestone.title}
                                     </span>
                                   )}
                                   {task.ue_tags[0] && (
-                                    <span className="rounded bg-[#1a2130] px-1 text-[9px] text-zinc-400">
+                                    <span className="rounded bg-[#1a2130] px-1 text-xs text-zinc-400">
                                       {task.ue_tags[0]}
                                     </span>
                                   )}
@@ -1081,7 +1081,7 @@ export function KanbanBoard() {
                                       e.target.value as TaskStatus
                                     )
                                   }
-                                  className="w-full rounded-md border border-[#242e40] bg-[#080a0f] px-2 py-1 text-[11px] font-medium text-zinc-200 focus:border-amber-500/60 focus:outline-none"
+                                  className="w-full rounded-md border border-[#242e40] bg-[#080a0f] px-2 py-1 text-xs font-medium text-zinc-200 focus:border-amber-500/60 focus:outline-none"
                                 >
                                   {TASK_STATUSES.map((s) => (
                                     <option key={s.value} value={s.value}>
@@ -1117,37 +1117,37 @@ export function KanbanBoard() {
                             <div className="flex flex-wrap items-center justify-between gap-1.5">
                               <div className="flex items-center gap-1.5">
                                 {task.kind === "bug" && (
-                                  <span className="inline-flex items-center gap-1 rounded bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-rose-300">
+                                  <span className="inline-flex items-center gap-1 rounded bg-rose-500/20 px-1.5 py-0.5 text-[12px] font-semibold text-rose-300">
                                     <Bug className="h-3 w-3" />
                                     Bug
                                   </span>
                                 )}
                                 <span
-                                  className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${priorityMeta.badgeClass}`}
+                                  className={`rounded border px-1.5 py-0.5 text-[12px] font-medium ${priorityMeta.badgeClass}`}
                                 >
                                   {priorityMeta.label}
                                 </span>
                               </div>
 
                               {task.milestone && (
-                                <span className="inline-flex items-center gap-1 text-[10px] text-cyan-300">
+                                <span className="inline-flex items-center gap-1 text-[12px] text-cyan-300">
                                   <Flag className="h-2.5 w-2.5" />
                                   {task.milestone.title}
                                 </span>
                               )}
                             </div>
 
-                            <h3 className="mt-2 text-xs font-semibold leading-snug text-zinc-100">
+                            <h3 className="mt-2 text-sm font-semibold leading-snug text-zinc-100">
                               {task.title}
                               {isPending && (
-                                <span className="ml-1.5 text-[10px] font-normal text-amber-300/80">
+                                <span className="ml-1.5 text-xs font-normal text-amber-300/80">
                                   (Kaydediliyor...)
                                 </span>
                               )}
                             </h3>
 
                             {isBlocked && (
-                              <div className="mt-2 flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-200">
+                              <div className="mt-2 flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[12px] text-amber-200">
                                 <AlertTriangle className="h-3 w-3 shrink-0 text-amber-400" />
                                 <span className="truncate">
                                   Bekliyor: {task.blocked_by_task?.title}
@@ -1160,13 +1160,13 @@ export function KanbanBoard() {
                                 {task.ue_tags.slice(0, 3).map((tag) => (
                                   <span
                                     key={tag}
-                                    className="rounded bg-[#1b2232] px-1.5 py-0.5 text-[10px] text-zinc-300"
+                                    className="rounded bg-[#1b2232] px-1.5 py-0.5 text-[12px] text-zinc-300"
                                   >
                                     {tag}
                                   </span>
                                 ))}
                                 {task.ue_tags.length > 3 && (
-                                  <span className="rounded bg-[#1b2232] px-1.5 py-0.5 text-[10px] text-zinc-400">
+                                  <span className="rounded bg-[#1b2232] px-1.5 py-0.5 text-[12px] text-zinc-400">
                                     +{task.ue_tags.length - 3}
                                   </span>
                                 )}
@@ -1174,7 +1174,7 @@ export function KanbanBoard() {
                             )}
 
                             {/* Card Footer */}
-                            <div className="mt-3 flex items-center justify-between border-t border-[#1d2534] pt-2.5 text-[11px] text-zinc-400">
+                            <div className="mt-3 flex items-center justify-between border-t border-[#1d2534] pt-2.5 text-xs text-zinc-400">
                               <div className="flex items-center gap-2.5">
                                 {task.subtasks.length > 0 && (
                                   <span className="inline-flex items-center gap-1">
@@ -1207,7 +1207,7 @@ export function KanbanBoard() {
                               {task.assignee ? (
                                 <span
                                   title={task.assignee.display_name}
-                                  className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-zinc-950"
+                                  className="flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold text-zinc-950"
                                   style={{
                                     backgroundColor:
                                       task.assignee.avatar_color,
@@ -1218,7 +1218,7 @@ export function KanbanBoard() {
                                     .toUpperCase()}
                                 </span>
                               ) : (
-                                <span className="text-[10px] text-zinc-600">
+                                <span className="text-[12px] text-zinc-600">
                                   Boşta
                                 </span>
                               )}
@@ -1317,7 +1317,7 @@ export function KanbanBoard() {
             )}
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
             <span className="inline-flex items-center gap-1.5 rounded-md border border-[#1d2534] bg-[#10141d] px-2 py-1">
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
               Bitti:{" "}
@@ -1355,7 +1355,7 @@ export function KanbanBoard() {
               <Users className="h-4 w-4 text-cyan-400" />
               <span>Ekip İş Yükü</span>
             </div>
-            <span className="text-[11px] text-zinc-500">
+            <span className="text-xs text-zinc-500">
               Filtrelemek için tıkla
             </span>
           </div>
@@ -1377,13 +1377,13 @@ export function KanbanBoard() {
                   }`}
                 >
                   <span
-                    className="flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-zinc-950"
+                    className="flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold text-zinc-950"
                     style={{ backgroundColor: member.avatar_color }}
                   >
                     {member.display_name.slice(0, 2).toUpperCase()}
                   </span>
                   <span className="font-medium">{member.display_name}</span>
-                  <span className="rounded bg-[#080a0f] px-1.5 py-0.5 font-mono text-[10px] text-zinc-300">
+                  <span className="rounded bg-[#080a0f] px-1.5 py-0.5 font-mono text-[12px] text-zinc-300">
                     {openCount} açık
                   </span>
                 </button>
@@ -1404,7 +1404,7 @@ export function KanbanBoard() {
               }`}
             >
               <span>Atanmamış</span>
-              <span className="rounded bg-[#080a0f] px-1.5 py-0.5 font-mono text-[10px] text-zinc-300">
+              <span className="rounded bg-[#080a0f] px-1.5 py-0.5 font-mono text-[12px] text-zinc-300">
                 {boardSummary.unassignedOpenCount}
               </span>
             </button>

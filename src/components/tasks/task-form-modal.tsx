@@ -305,7 +305,7 @@ export function TaskFormModal({
                     key={tag}
                     type="button"
                     onClick={() => toggleTag(tag)}
-                    className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
+                    className={`rounded-full border px-2.5 py-1 text-xs font-medium transition ${
                       active
                         ? "border-amber-500/50 bg-amber-500/20 text-amber-200"
                         : "border-[#242e40] bg-[#080a0f] text-zinc-400 hover:text-zinc-200"

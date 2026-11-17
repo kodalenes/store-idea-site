@@ -471,13 +471,13 @@ export function TaskDetailDrawer({
         <div className="flex items-center justify-between border-b border-[#1f2735] px-6 py-4">
           <div className="flex items-center gap-2">
             {task.kind === "bug" && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/40 bg-rose-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-rose-300">
+              <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/40 bg-rose-500/15 px-2.5 py-0.5 text-xs font-semibold text-rose-300">
                 <Bug className="h-3 w-3" />
                 Bug
               </span>
             )}
             <span
-              className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${priorityMeta.badgeClass}`}
+              className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${priorityMeta.badgeClass}`}
             >
               {priorityMeta.label} Öncelik
             </span>
@@ -601,7 +601,7 @@ export function TaskDetailDrawer({
                 {task.ue_tags.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-full border border-[#263042] bg-[#131926] px-2.5 py-0.5 text-[11px] font-medium text-zinc-300"
+                    className="rounded-full border border-[#263042] bg-[#131926] px-2.5 py-0.5 text-xs font-medium text-zinc-300"
                   >
                     {tag}
                   </span>
@@ -670,7 +670,7 @@ export function TaskDetailDrawer({
 
           {/* Description */}
           <div className="rounded-xl border border-[#1f2735] bg-[#090c12] p-4">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
               Açıklama
             </p>
             <MarkdownViewer
@@ -686,7 +686,7 @@ export function TaskDetailDrawer({
                 Alt Görevler ({doneCount}/{totalSubtasks})
               </p>
               {totalSubtasks > 0 && (
-                <span className="font-mono text-[11px] text-amber-300">
+                <span className="font-mono text-xs text-amber-300">
                   %{subtaskPct}
                 </span>
               )}
@@ -767,7 +767,7 @@ export function TaskDetailDrawer({
                 type="button"
                 disabled={uploading}
                 onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center gap-1 rounded-lg border border-[#242e40] bg-[#151b26] px-2.5 py-1 text-[11px] font-medium text-zinc-200 hover:border-amber-500/40"
+                className="inline-flex items-center gap-1 rounded-lg border border-[#242e40] bg-[#151b26] px-2.5 py-1 text-xs font-medium text-zinc-200 hover:border-amber-500/40"
               >
                 <Upload className="h-3 w-3" />
                 {uploading ? "Yükleniyor..." : "Görsel Ekle"}
@@ -807,7 +807,7 @@ export function TaskDetailDrawer({
                         className="object-cover"
                       />
                     </a>
-                    <div className="flex items-center justify-between px-2 py-1.5 text-[10px] text-zinc-400">
+                    <div className="flex items-center justify-between px-2 py-1.5 text-[12px] text-zinc-400">
                       <span className="truncate">{att.file_name}</span>
                       <button
                         type="button"

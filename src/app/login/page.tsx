@@ -7,7 +7,7 @@ export default function LoginPage() {
   const { isConfigured } = getSupabaseConfig();
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#080a0f] px-4 py-12">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#0c1017] px-4 py-12">
       <div className="mb-6 w-full max-w-md">
         {!isConfigured && (
           <Link

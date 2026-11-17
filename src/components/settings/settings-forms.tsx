@@ -650,7 +650,7 @@ function collectChangedFiles_(folder, folderPath, sinceMs, out) {
                   <p className="truncate text-xs text-zinc-400">
                     {member.role_title}
                   </p>
-                  <p className="truncate font-mono text-[11px] text-zinc-500">
+                  <p className="truncate font-mono text-xs text-zinc-500">
                     {member.email}
                   </p>
                 </div>
@@ -776,11 +776,11 @@ function collectChangedFiles_(folder, folderPath, sinceMs, out) {
             </button>
           </div>
 
-          <pre className="max-h-56 overflow-auto rounded-lg border border-[#1d2534] bg-[#080a0f] p-3 font-mono text-[11px] leading-relaxed text-zinc-300">
+          <pre className="max-h-56 overflow-auto rounded-lg border border-[#1d2534] bg-[#080a0f] p-3 font-mono text-xs leading-relaxed text-zinc-300">
             <code>{appsScriptCode}</code>
           </pre>
 
-          <ol className="list-inside list-decimal space-y-1 text-[11px] text-zinc-400">
+          <ol className="list-inside list-decimal space-y-1 text-xs text-zinc-400">
             <li>
               Önce{" "}
               <code className="rounded bg-black/40 px-1 py-0.5 font-mono text-amber-300">

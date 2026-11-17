@@ -209,7 +209,7 @@ export function IdeaFormModal({
               <button
                 type="button"
                 onClick={() => setPreviewMode((p) => !p)}
-                className="inline-flex items-center gap-1 rounded-md border border-[#242e40] bg-[#131926] px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:text-amber-300"
+                className="inline-flex items-center gap-1 rounded-md border border-[#242e40] bg-[#131926] px-2.5 py-1 text-xs font-medium text-zinc-300 hover:text-amber-300"
               >
                 {previewMode ? (
                   <>

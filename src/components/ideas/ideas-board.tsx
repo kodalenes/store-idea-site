@@ -418,11 +418,11 @@ export function IdeasBoard() {
                       <h3 className="truncate text-xs font-semibold tracking-wide text-zinc-100">
                         {column.label}
                       </h3>
-                      <span className="rounded-full bg-[#171e2c] px-2 py-0.5 font-mono text-[11px] text-zinc-400">
+                      <span className="rounded-full bg-[#171e2c] px-2 py-0.5 font-mono text-xs text-zinc-400">
                         {colIdeas.length}
                       </span>
                     </div>
-                    <p className="mt-0.5 truncate text-[10px] text-zinc-500">
+                    <p className="mt-0.5 truncate text-[12px] text-zinc-500">
                       {column.description}
                     </p>
                   </div>
@@ -442,7 +442,7 @@ export function IdeasBoard() {
                 {/* Column Cards */}
                 <div className="flex-1 space-y-2.5 overflow-y-auto overscroll-contain p-2.5">
                   {colIdeas.length === 0 ? (
-                    <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-[#1e2636] text-[11px] text-zinc-600">
+                    <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-[#1e2636] text-xs text-zinc-600">
                       Bu aşamada fikir yok
                     </div>
                   ) : (
@@ -475,7 +475,7 @@ export function IdeasBoard() {
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span
-                              className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${catMeta.badgeClass}`}
+                              className={`rounded-full border px-2 py-0.5 text-[12px] font-semibold ${catMeta.badgeClass}`}
                             >
                               {catMeta.label}
                             </span>
@@ -484,7 +484,7 @@ export function IdeasBoard() {
                               type="button"
                               disabled={isPending}
                               onClick={() => handleOptimisticVote(idea.id)}
-                              className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold transition ${
+                              className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[12px] font-semibold transition ${
                                 idea.has_voted
                                   ? "border-amber-500/50 bg-amber-500/20 text-amber-300"
                                   : "border-[#242e40] bg-[#0b0f17] text-zinc-400 hover:border-amber-500/30 hover:text-zinc-200"
@@ -496,23 +496,23 @@ export function IdeasBoard() {
                           </div>
 
                           {isPending ? (
-                            <span className="mt-2 block text-xs font-semibold text-zinc-200">
+                            <span className="mt-2 block text-sm font-semibold leading-snug text-zinc-200">
                               {idea.title}{" "}
-                              <span className="text-[10px] font-normal text-amber-300/80">
+                              <span className="text-xs font-normal text-amber-300/80">
                                 (Kaydediliyor...)
                               </span>
                             </span>
                           ) : (
                             <Link
                               href={`/ideas/${idea.id}`}
-                              className="mt-2 block text-xs font-semibold leading-snug text-zinc-100 transition group-hover:text-amber-300"
+                              className="mt-2 block text-sm font-semibold leading-snug text-zinc-100 transition group-hover:text-amber-300"
                             >
                               {idea.title}
                             </Link>
                           )}
 
                           {idea.summary && (
-                            <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-zinc-400">
+                            <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-zinc-400">
                               {idea.summary}
                             </p>
                           )}
@@ -521,7 +521,7 @@ export function IdeasBoard() {
                             <button
                               type="button"
                               onClick={() => navigateTab("/tasks")}
-                              className="mt-2 inline-flex items-center gap-1 rounded border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.5 text-[10px] text-cyan-300 hover:bg-cyan-500/20"
+                              className="mt-2 inline-flex items-center gap-1 rounded border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.5 text-[12px] text-cyan-300 hover:bg-cyan-500/20"
                             >
                               <KanbanSquare className="h-3 w-3" />
                               {linkedTasks[0]
@@ -531,7 +531,7 @@ export function IdeasBoard() {
                             </button>
                           )}
 
-                          <div className="mt-3 flex items-center justify-between border-t border-[#1d2534] pt-2 text-[10px] text-zinc-400">
+                          <div className="mt-3 flex items-center justify-between border-t border-[#1d2534] pt-2 text-[12px] text-zinc-400">
                             <div className="flex items-center gap-2">
                               {idea.attachment_count > 0 && (
                                 <span className="inline-flex items-center gap-1">
@@ -548,7 +548,7 @@ export function IdeasBoard() {
                             {idea.author ? (
                               <span
                                 title={idea.author.display_name}
-                                className="flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-zinc-950"
+                                className="flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold text-zinc-950"
                                 style={{
                                   backgroundColor: idea.author.avatar_color,
                                 }}
@@ -558,7 +558,7 @@ export function IdeasBoard() {
                                   .toUpperCase()}
                               </span>
                             ) : (
-                              <span className="text-[10px] text-zinc-600">
+                              <span className="text-[12px] text-zinc-600">
                                 Ekip
                               </span>
                             )}
@@ -576,7 +576,7 @@ export function IdeasBoard() {
                                   e.target.value as IdeaStatus
                                 )
                               }
-                              className="w-full rounded-md border border-[#242e40] bg-[#080a0f] px-2 py-1 text-[11px] text-zinc-200 focus:border-amber-500/60 focus:outline-none"
+                              className="w-full rounded-md border border-[#242e40] bg-[#080a0f] px-2 py-1 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
                             >
                               {IDEA_STATUSES.map((st) => (
                                 <option key={st.value} value={st.value}>
@@ -629,13 +629,13 @@ export function IdeasBoard() {
                 className="flex flex-wrap items-center gap-2.5 px-3.5 py-2.5 text-xs transition hover:bg-[#131926]"
               >
                 <span
-                  className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${catMeta.badgeClass}`}
+                  className={`shrink-0 rounded-full border px-2 py-0.5 text-[12px] font-semibold ${catMeta.badgeClass}`}
                 >
                   {catMeta.label}
                 </span>
 
                 <span
-                  className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium sm:inline-block ${statusMeta.badgeClass}`}
+                  className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[12px] font-medium sm:inline-block ${statusMeta.badgeClass}`}
                 >
                   {statusMeta.label}
                 </span>
@@ -644,7 +644,7 @@ export function IdeasBoard() {
                   {isPending ? (
                     <span className="font-semibold text-zinc-200">
                       {idea.title}{" "}
-                      <span className="text-[11px] font-normal text-amber-300/80">
+                      <span className="text-xs font-normal text-amber-300/80">
                         (Kaydediliyor...)
                       </span>
                     </span>
@@ -657,7 +657,7 @@ export function IdeasBoard() {
                     </Link>
                   )}
                   {idea.summary && (
-                    <span className="ml-2 hidden text-[11px] text-zinc-500 lg:inline">
+                    <span className="ml-2 hidden text-xs text-zinc-500 lg:inline">
                       — {idea.summary}
                     </span>
                   )}
@@ -672,7 +672,7 @@ export function IdeasBoard() {
                         ? `Bağlı görev: ${linkedTasks[0].title}`
                         : "Kanban Panosuna Git"
                     }
-                    className="hidden shrink-0 items-center gap-1 rounded-md border border-cyan-500/35 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 hover:bg-cyan-500/20 md:inline-flex"
+                    className="hidden shrink-0 items-center gap-1 rounded-md border border-cyan-500/35 bg-cyan-500/10 px-2 py-0.5 text-[12px] font-medium text-cyan-300 hover:bg-cyan-500/20 md:inline-flex"
                   >
                     <KanbanSquare className="h-3 w-3" />
                     {linkedTasks[0]
@@ -682,7 +682,7 @@ export function IdeasBoard() {
                   </button>
                 )}
 
-                <div className="hidden shrink-0 items-center gap-2.5 text-[11px] text-zinc-400 md:flex">
+                <div className="hidden shrink-0 items-center gap-2.5 text-xs text-zinc-400 md:flex">
                   {idea.attachment_count > 0 && (
                     <span className="inline-flex items-center gap-1">
                       <Paperclip className="h-3 w-3 text-zinc-500" />
@@ -698,7 +698,7 @@ export function IdeasBoard() {
                 {idea.author && (
                   <span
                     title={idea.author.display_name}
-                    className="hidden h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-zinc-950 sm:flex"
+                    className="hidden h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold text-zinc-950 sm:flex"
                     style={{ backgroundColor: idea.author.avatar_color }}
                   >
                     {idea.author.display_name.slice(0, 2).toUpperCase()}
@@ -709,7 +709,7 @@ export function IdeasBoard() {
                   type="button"
                   disabled={isPending}
                   onClick={() => handleOptimisticVote(idea.id)}
-                  className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold transition ${
+                  className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-xs font-semibold transition ${
                     idea.has_voted
                       ? "border-amber-500/50 bg-amber-500/20 text-amber-300"
                       : "border-[#242e40] bg-[#080a0f] text-zinc-400 hover:border-amber-500/30 hover:text-zinc-200"
@@ -749,12 +749,12 @@ export function IdeasBoard() {
               >
                 <div className="flex items-center justify-between gap-1.5">
                   <span
-                    className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${catMeta.badgeClass}`}
+                    className={`rounded-full border px-2 py-0.5 text-[12px] font-semibold ${catMeta.badgeClass}`}
                   >
                     {catMeta.label}
                   </span>
                   <span
-                    className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusMeta.badgeClass}`}
+                    className={`rounded-full border px-2 py-0.5 text-[12px] font-medium ${statusMeta.badgeClass}`}
                   >
                     {statusMeta.label}
                   </span>
@@ -773,22 +773,22 @@ export function IdeasBoard() {
                   </Link>
                 )}
 
-                <p className="mt-1 line-clamp-1 flex-1 text-[11px] text-zinc-400">
+                <p className="mt-1 line-clamp-1 flex-1 text-xs text-zinc-400">
                   {idea.summary || "Kısa özet girilmemiş."}
                 </p>
 
-                <div className="mt-3 flex items-center justify-between border-t border-[#1b2230] pt-2.5 text-[11px] text-zinc-400">
+                <div className="mt-3 flex items-center justify-between border-t border-[#1b2230] pt-2.5 text-xs text-zinc-400">
                   <div className="flex items-center gap-2">
                     {idea.author ? (
                       <span
                         title={idea.author.display_name}
-                        className="flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-zinc-950"
+                        className="flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold text-zinc-950"
                         style={{ backgroundColor: idea.author.avatar_color }}
                       >
                         {idea.author.display_name.slice(0, 2).toUpperCase()}
                       </span>
                     ) : (
-                      <span className="text-[10px] text-zinc-500">Ekip</span>
+                      <span className="text-[12px] text-zinc-500">Ekip</span>
                     )}
                     <span className="inline-flex items-center gap-1">
                       <MessageSquare className="h-3 w-3 text-zinc-500" />
@@ -811,7 +811,7 @@ export function IdeasBoard() {
                     type="button"
                     disabled={isPending}
                     onClick={() => handleOptimisticVote(idea.id)}
-                    className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold transition ${
+                    className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold transition ${
                       idea.has_voted
                         ? "border-amber-500/50 bg-amber-500/20 text-amber-300"
                         : "border-[#242e40] bg-[#0b0f17] text-zinc-400 hover:border-amber-500/30 hover:text-zinc-200"
@@ -868,12 +868,12 @@ export function IdeasBoard() {
               <div className="flex flex-1 flex-col p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span
-                    className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${catMeta.badgeClass}`}
+                    className={`rounded-full border px-2.5 py-0.5 text-[12px] font-semibold ${catMeta.badgeClass}`}
                   >
                     {catMeta.label}
                   </span>
                   <span
-                    className={`rounded-full border px-2.5 py-0.5 text-[10px] font-medium ${statusMeta.badgeClass}`}
+                    className={`rounded-full border px-2.5 py-0.5 text-[12px] font-medium ${statusMeta.badgeClass}`}
                   >
                     {statusMeta.label}
                   </span>
@@ -882,7 +882,7 @@ export function IdeasBoard() {
                 {isPending ? (
                   <span className="mt-3 block text-base font-semibold text-zinc-200">
                     {idea.title}{" "}
-                    <span className="text-[11px] font-normal text-amber-300/80">
+                    <span className="text-xs font-normal text-amber-300/80">
                       (Kaydediliyor...)
                     </span>
                   </span>
@@ -910,18 +910,18 @@ export function IdeasBoard() {
                           key={t.id}
                           type="button"
                           onClick={() => navigateTab("/tasks")}
-                          className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-[10px] text-cyan-200 transition hover:bg-cyan-500/20"
+                          className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-[12px] text-cyan-200 transition hover:bg-cyan-500/20"
                         >
                           <KanbanSquare className="h-3 w-3 shrink-0 text-cyan-400" />
                           <span className="truncate">{t.title}</span>
-                          <span className="shrink-0 rounded bg-black/30 px-1 text-[9px] text-cyan-300">
+                          <span className="shrink-0 rounded bg-black/30 px-1 text-xs text-cyan-300">
                             {taskStatusLabel}
                           </span>
                         </button>
                       );
                     })}
                     {linkedTasks.length > 2 && (
-                      <span className="rounded-md border border-cyan-500/20 bg-cyan-500/5 px-2 py-1 text-[10px] text-cyan-300">
+                      <span className="rounded-md border border-cyan-500/20 bg-cyan-500/5 px-2 py-1 text-[12px] text-cyan-300">
                         +{linkedTasks.length - 2} görev
                       </span>
                     )}
@@ -934,17 +934,17 @@ export function IdeasBoard() {
                     {idea.author ? (
                       <div className="flex items-center gap-1.5">
                         <span
-                          className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-zinc-950"
+                          className="flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold text-zinc-950"
                           style={{ backgroundColor: idea.author.avatar_color }}
                         >
                           {idea.author.display_name.slice(0, 2).toUpperCase()}
                         </span>
-                        <span className="text-[11px] text-zinc-400">
+                        <span className="text-xs text-zinc-400">
                           {idea.author.display_name}
                         </span>
                       </div>
                     ) : (
-                      <span className="text-[11px] text-zinc-500">Ekip</span>
+                      <span className="text-xs text-zinc-500">Ekip</span>
                     )}
                   </div>
 
@@ -987,7 +987,7 @@ export function IdeasBoard() {
                       type="button"
                       disabled={isPending}
                       onClick={() => handleOptimisticVote(idea.id)}
-                      className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold transition ${
+                      className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-semibold transition ${
                         idea.has_voted
                           ? "border-amber-500/50 bg-amber-500/20 text-amber-300"
                           : "border-[#242e40] bg-[#0b0f17] text-zinc-400 hover:border-amber-500/30 hover:text-zinc-200"
@@ -1247,7 +1247,7 @@ export function IdeasBoard() {
                   <h2 className="text-sm font-semibold text-zinc-100">
                     Fikir Havuzu & Oyun Aşamaları
                   </h2>
-                  <span className="rounded-full bg-[#182030] px-2 py-0.5 font-mono text-[11px] text-zinc-300">
+                  <span className="rounded-full bg-[#182030] px-2 py-0.5 font-mono text-xs text-zinc-300">
                     {activeIdeas.length}
                   </span>
                 </div>
@@ -1278,11 +1278,11 @@ export function IdeasBoard() {
                       <h2 className="text-sm font-semibold text-zinc-100">
                         Göreve Dönüştürülen Fikirler
                       </h2>
-                      <span className="rounded-full border border-cyan-500/30 bg-cyan-500/15 px-2 py-0.5 font-mono text-[11px] text-cyan-300">
+                      <span className="rounded-full border border-cyan-500/30 bg-cyan-500/15 px-2 py-0.5 font-mono text-xs text-cyan-300">
                         {convertedIdeas.length}
                       </span>
                     </div>
-                    <p className="text-[11px] text-zinc-400">
+                    <p className="text-xs text-zinc-400">
                       Kanban panosuna görev olarak aktarılmış GDD ve mekanik
                       fikirleri
                     </p>
