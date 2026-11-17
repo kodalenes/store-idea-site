@@ -15,14 +15,29 @@ import {
   Lightbulb,
   AlertCircle,
   X,
+  LayoutGrid,
+  Grid2x2,
+  List,
+  ArrowRight,
+  CheckCircle2,
 } from "lucide-react";
-import { IDEA_CATEGORIES, IDEA_STATUSES } from "@/lib/constants";
+import {
+  IDEA_CATEGORIES,
+  IDEA_STATUSES,
+  TASK_STATUSES,
+} from "@/lib/constants";
 import { useStudioStore } from "@/components/studio/studio-store";
 import {
   createIdeaAction,
   toggleIdeaVoteAction,
 } from "@/app/actions/ideas";
 import type { IdeaFormValues } from "@/components/ideas/idea-form-modal";
+import type {
+  IdeaCategory,
+  IdeaListItem,
+  IdeaStatus,
+  TaskBoardItem,
+} from "@/types/studio";
 
 const IdeaFormModal = dynamic(
   () =>
@@ -31,14 +46,21 @@ const IdeaFormModal = dynamic(
     ),
   { ssr: false }
 );
-import type {
-  IdeaCategory,
-  IdeaListItem,
-  IdeaStatus,
-} from "@/types/studio";
+
+type IdeaSectionTab = "split" | "active" | "converted";
 
 export function IdeasBoard() {
-  const { ideas, setIdeas, currentProfile, isConfigured } = useStudioStore();
+  const {
+    ideas,
+    setIdeas,
+    tasks,
+    currentProfile,
+    isConfigured,
+    ideasViewMode,
+    setIdeasViewMode,
+    navigateTab,
+  } = useStudioStore();
+
   const [ideaError, setIdeaError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<IdeaCategory | "all">(
@@ -46,29 +68,65 @@ export function IdeasBoard() {
   );
   const [statusFilter, setStatusFilter] = useState<IdeaStatus | "all">("all");
   const [sortBy, setSortBy] = useState<"recent" | "votes">("recent");
+  const [sectionTab, setSectionTab] = useState<IdeaSectionTab>("split");
   const [createOpen, setCreateOpen] = useState(false);
 
-  const filteredIdeas = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const list = ideas.filter((idea) => {
-      if (categoryFilter !== "all" && idea.category !== categoryFilter) {
-        return false;
-      }
-      if (statusFilter !== "all" && idea.status !== statusFilter) {
-        return false;
-      }
-      if (q) {
-        const hay = `${idea.title} ${idea.summary} ${idea.content_md}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      return true;
-    });
-
-    if (sortBy === "votes") {
-      return [...list].sort((a, b) => b.vote_count - a.vote_count);
+  const linkedTasksByIdea = useMemo(() => {
+    const map = new Map<string, TaskBoardItem[]>();
+    for (const task of tasks) {
+      if (!task.source_idea_id) continue;
+      const arr = map.get(task.source_idea_id) ?? [];
+      arr.push(task);
+      map.set(task.source_idea_id, arr);
     }
-    return list;
-  }, [ideas, search, categoryFilter, statusFilter, sortBy]);
+    return map;
+  }, [tasks]);
+
+  const { totalActiveCount, totalConvertedCount, activeIdeas, convertedIdeas } =
+    useMemo(() => {
+      const q = search.trim().toLowerCase();
+
+      const isConverted = (idea: IdeaListItem) =>
+        idea.linked_task_count > 0 ||
+        (linkedTasksByIdea.get(idea.id)?.length ?? 0) > 0;
+
+      const totalConverted = ideas.filter(isConverted).length;
+      const totalActive = ideas.length - totalConverted;
+
+      const matches = ideas.filter((idea) => {
+        if (categoryFilter !== "all" && idea.category !== categoryFilter) {
+          return false;
+        }
+        if (statusFilter !== "all" && idea.status !== statusFilter) {
+          return false;
+        }
+        if (q) {
+          const hay =
+            `${idea.title} ${idea.summary} ${idea.content_md}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+
+      const ordered =
+        sortBy === "votes"
+          ? [...matches].sort((a, b) => b.vote_count - a.vote_count)
+          : matches;
+
+      return {
+        totalActiveCount: totalActive,
+        totalConvertedCount: totalConverted,
+        activeIdeas: ordered.filter((idea) => !isConverted(idea)),
+        convertedIdeas: ordered.filter(isConverted),
+      };
+    }, [
+      ideas,
+      linkedTasksByIdea,
+      search,
+      categoryFilter,
+      statusFilter,
+      sortBy,
+    ]);
 
   async function handleCreateIdea(values: IdeaFormValues) {
     setIdeaError(null);
@@ -77,7 +135,9 @@ export function IdeasBoard() {
       return { ok: false, error: "Fikir başlığı zorunludur." };
     }
 
-    const tempId = `temp-idea-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const tempId = `temp-idea-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 7)}`;
     const now = new Date().toISOString();
     const optimisticIdea: IdeaListItem = {
       id: tempId,
@@ -185,8 +245,409 @@ export function IdeasBoard() {
     }
   }
 
+  function renderIdeasCollection(list: IdeaListItem[]) {
+    if (ideasViewMode === "list") {
+      return (
+        <div className="divide-y divide-[#182030] overflow-hidden rounded-xl border border-[#1f2735] bg-[#0c1018]">
+          {list.map((idea) => {
+            const isPending = idea.id.startsWith("temp-");
+            const catMeta =
+              IDEA_CATEGORIES.find((c) => c.value === idea.category) ??
+              IDEA_CATEGORIES[0];
+            const statusMeta =
+              IDEA_STATUSES.find((s) => s.value === idea.status) ??
+              IDEA_STATUSES[0];
+            const linkedTasks = linkedTasksByIdea.get(idea.id) ?? [];
+            const linkedCount = Math.max(
+              idea.linked_task_count,
+              linkedTasks.length
+            );
+
+            return (
+              <div
+                key={idea.id}
+                className="flex flex-wrap items-center gap-2.5 px-3.5 py-2.5 text-xs transition hover:bg-[#131926]"
+              >
+                <span
+                  className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${catMeta.badgeClass}`}
+                >
+                  {catMeta.label}
+                </span>
+
+                <span
+                  className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium sm:inline-block ${statusMeta.badgeClass}`}
+                >
+                  {statusMeta.label}
+                </span>
+
+                <div className="min-w-40 flex-1 truncate">
+                  {isPending ? (
+                    <span className="font-semibold text-zinc-200">
+                      {idea.title}{" "}
+                      <span className="text-[11px] font-normal text-amber-300/80">
+                        (Kaydediliyor...)
+                      </span>
+                    </span>
+                  ) : (
+                    <Link
+                      href={`/ideas/${idea.id}`}
+                      className="font-semibold text-zinc-100 transition hover:text-amber-300"
+                    >
+                      {idea.title}
+                    </Link>
+                  )}
+                  {idea.summary && (
+                    <span className="ml-2 hidden text-[11px] text-zinc-500 lg:inline">
+                      — {idea.summary}
+                    </span>
+                  )}
+                </div>
+
+                {linkedCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => navigateTab("/tasks")}
+                    title={
+                      linkedTasks[0]
+                        ? `Bağlı görev: ${linkedTasks[0].title}`
+                        : "Kanban Panosuna Git"
+                    }
+                    className="hidden shrink-0 items-center gap-1 rounded-md border border-cyan-500/35 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 hover:bg-cyan-500/20 md:inline-flex"
+                  >
+                    <KanbanSquare className="h-3 w-3" />
+                    {linkedTasks[0]
+                      ? linkedTasks[0].title.slice(0, 22) +
+                        (linkedTasks[0].title.length > 22 ? "…" : "")
+                      : `${linkedCount} Görev`}
+                  </button>
+                )}
+
+                <div className="hidden shrink-0 items-center gap-2.5 text-[11px] text-zinc-400 md:flex">
+                  {idea.attachment_count > 0 && (
+                    <span className="inline-flex items-center gap-1">
+                      <Paperclip className="h-3 w-3 text-zinc-500" />
+                      {idea.attachment_count}
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1">
+                    <MessageSquare className="h-3 w-3 text-zinc-500" />
+                    {idea.comment_count}
+                  </span>
+                </div>
+
+                {idea.author && (
+                  <span
+                    title={idea.author.display_name}
+                    className="hidden h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-zinc-950 sm:flex"
+                    style={{ backgroundColor: idea.author.avatar_color }}
+                  >
+                    {idea.author.display_name.slice(0, 2).toUpperCase()}
+                  </span>
+                )}
+
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => handleOptimisticVote(idea.id)}
+                  className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold transition ${
+                    idea.has_voted
+                      ? "border-amber-500/50 bg-amber-500/20 text-amber-300"
+                      : "border-[#242e40] bg-[#080a0f] text-zinc-400 hover:border-amber-500/30 hover:text-zinc-200"
+                  }`}
+                >
+                  <ThumbsUp className="h-3 w-3" />
+                  {idea.vote_count}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    if (ideasViewMode === "compact") {
+      return (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {list.map((idea) => {
+            const isPending = idea.id.startsWith("temp-");
+            const catMeta =
+              IDEA_CATEGORIES.find((c) => c.value === idea.category) ??
+              IDEA_CATEGORIES[0];
+            const statusMeta =
+              IDEA_STATUSES.find((s) => s.value === idea.status) ??
+              IDEA_STATUSES[0];
+            const linkedTasks = linkedTasksByIdea.get(idea.id) ?? [];
+            const linkedCount = Math.max(
+              idea.linked_task_count,
+              linkedTasks.length
+            );
+
+            return (
+              <article
+                key={idea.id}
+                className="group flex flex-col rounded-xl border border-[#1f2735] bg-[#10141d] p-3.5 transition hover:border-amber-500/40"
+              >
+                <div className="flex items-center justify-between gap-1.5">
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${catMeta.badgeClass}`}
+                  >
+                    {catMeta.label}
+                  </span>
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusMeta.badgeClass}`}
+                  >
+                    {statusMeta.label}
+                  </span>
+                </div>
+
+                {isPending ? (
+                  <span className="mt-2.5 block truncate text-sm font-semibold text-zinc-200">
+                    {idea.title}
+                  </span>
+                ) : (
+                  <Link
+                    href={`/ideas/${idea.id}`}
+                    className="mt-2.5 block truncate text-sm font-semibold text-zinc-100 transition group-hover:text-amber-300"
+                  >
+                    {idea.title}
+                  </Link>
+                )}
+
+                <p className="mt-1 line-clamp-1 flex-1 text-[11px] text-zinc-400">
+                  {idea.summary || "Kısa özet girilmemiş."}
+                </p>
+
+                <div className="mt-3 flex items-center justify-between border-t border-[#1b2230] pt-2.5 text-[11px] text-zinc-400">
+                  <div className="flex items-center gap-2">
+                    {idea.author ? (
+                      <span
+                        title={idea.author.display_name}
+                        className="flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-zinc-950"
+                        style={{ backgroundColor: idea.author.avatar_color }}
+                      >
+                        {idea.author.display_name.slice(0, 2).toUpperCase()}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-zinc-500">Ekip</span>
+                    )}
+                    <span className="inline-flex items-center gap-1">
+                      <MessageSquare className="h-3 w-3 text-zinc-500" />
+                      {idea.comment_count}
+                    </span>
+                    {linkedCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => navigateTab("/tasks")}
+                        className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200"
+                        title="Bağlı Görev"
+                      >
+                        <KanbanSquare className="h-3 w-3" />
+                        {linkedCount}
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => handleOptimisticVote(idea.id)}
+                    className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold transition ${
+                      idea.has_voted
+                        ? "border-amber-500/50 bg-amber-500/20 text-amber-300"
+                        : "border-[#242e40] bg-[#0b0f17] text-zinc-400 hover:border-amber-500/30 hover:text-zinc-200"
+                    }`}
+                  >
+                    <ThumbsUp className="h-3 w-3" />
+                    {idea.vote_count}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // Default: Detailed Cards View
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {list.map((idea) => {
+          const isPending = idea.id.startsWith("temp-");
+          const catMeta =
+            IDEA_CATEGORIES.find((c) => c.value === idea.category) ??
+            IDEA_CATEGORIES[0];
+          const statusMeta =
+            IDEA_STATUSES.find((s) => s.value === idea.status) ??
+            IDEA_STATUSES[0];
+          const linkedTasks = linkedTasksByIdea.get(idea.id) ?? [];
+          const linkedCount = Math.max(
+            idea.linked_task_count,
+            linkedTasks.length
+          );
+
+          return (
+            <article
+              key={idea.id}
+              className="group flex flex-col overflow-hidden rounded-xl border border-[#1f2735] bg-[#10141d] transition hover:border-amber-500/40"
+            >
+              {idea.preview_image_url && !isPending && (
+                <Link
+                  href={`/ideas/${idea.id}`}
+                  className="relative block h-40 w-full overflow-hidden border-b border-[#1f2735] bg-[#080a0f]"
+                >
+                  <Image
+                    src={idea.preview_image_url}
+                    alt={idea.title}
+                    fill
+                    unoptimized
+                    className="object-cover transition duration-300 group-hover:scale-105"
+                  />
+                </Link>
+              )}
+
+              <div className="flex flex-1 flex-col p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span
+                    className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${catMeta.badgeClass}`}
+                  >
+                    {catMeta.label}
+                  </span>
+                  <span
+                    className={`rounded-full border px-2.5 py-0.5 text-[10px] font-medium ${statusMeta.badgeClass}`}
+                  >
+                    {statusMeta.label}
+                  </span>
+                </div>
+
+                {isPending ? (
+                  <span className="mt-3 block text-base font-semibold text-zinc-200">
+                    {idea.title}{" "}
+                    <span className="text-[11px] font-normal text-amber-300/80">
+                      (Kaydediliyor...)
+                    </span>
+                  </span>
+                ) : (
+                  <Link
+                    href={`/ideas/${idea.id}`}
+                    className="mt-3 block text-base font-semibold text-zinc-100 transition group-hover:text-amber-300"
+                  >
+                    {idea.title}
+                  </Link>
+                )}
+
+                <p className="mt-1.5 line-clamp-2 flex-1 text-xs leading-relaxed text-zinc-400">
+                  {idea.summary || "Kısa özet girilmemiş."}
+                </p>
+
+                {linkedTasks.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {linkedTasks.slice(0, 2).map((t) => {
+                      const taskStatusLabel =
+                        TASK_STATUSES.find((s) => s.value === t.status)
+                          ?.label ?? t.status;
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => navigateTab("/tasks")}
+                          className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-[10px] text-cyan-200 transition hover:bg-cyan-500/20"
+                        >
+                          <KanbanSquare className="h-3 w-3 shrink-0 text-cyan-400" />
+                          <span className="truncate">{t.title}</span>
+                          <span className="shrink-0 rounded bg-black/30 px-1 text-[9px] text-cyan-300">
+                            {taskStatusLabel}
+                          </span>
+                        </button>
+                      );
+                    })}
+                    {linkedTasks.length > 2 && (
+                      <span className="rounded-md border border-cyan-500/20 bg-cyan-500/5 px-2 py-1 text-[10px] text-cyan-300">
+                        +{linkedTasks.length - 2} görev
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Meta Footer */}
+                <div className="mt-4 flex items-center justify-between border-t border-[#1b2230] pt-3">
+                  <div className="flex items-center gap-2">
+                    {idea.author ? (
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-zinc-950"
+                          style={{ backgroundColor: idea.author.avatar_color }}
+                        >
+                          {idea.author.display_name.slice(0, 2).toUpperCase()}
+                        </span>
+                        <span className="text-[11px] text-zinc-400">
+                          {idea.author.display_name}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-zinc-500">Ekip</span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3 text-xs text-zinc-400">
+                    {idea.reference_links.length > 0 && (
+                      <span
+                        title="Referans Linki"
+                        className="inline-flex items-center gap-1"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5 text-zinc-500" />
+                        {idea.reference_links.length}
+                      </span>
+                    )}
+                    {idea.attachment_count > 0 && (
+                      <span
+                        title="Görsel / Ek"
+                        className="inline-flex items-center gap-1"
+                      >
+                        <Paperclip className="h-3.5 w-3.5 text-zinc-500" />
+                        {idea.attachment_count}
+                      </span>
+                    )}
+                    <span
+                      title="Yorum"
+                      className="inline-flex items-center gap-1"
+                    >
+                      <MessageSquare className="h-3.5 w-3.5 text-zinc-500" />
+                      {idea.comment_count}
+                    </span>
+                    {linkedCount > 0 && (
+                      <span
+                        title="Bağlı Görev"
+                        className="inline-flex items-center gap-1 text-cyan-300"
+                      >
+                        <KanbanSquare className="h-3.5 w-3.5" />
+                        {linkedCount}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => handleOptimisticVote(idea.id)}
+                      className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold transition ${
+                        idea.has_voted
+                          ? "border-amber-500/50 bg-amber-500/20 text-amber-300"
+                          : "border-[#242e40] bg-[#0b0f17] text-zinc-400 hover:border-amber-500/30 hover:text-zinc-200"
+                      }`}
+                    >
+                      <ThumbsUp className="h-3 w-3" />
+                      {idea.vote_count}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-8">
       {ideaError && (
         <div className="flex items-center justify-between gap-3 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-2.5 text-sm text-rose-200">
           <span className="inline-flex items-center gap-2">
@@ -202,118 +663,202 @@ export function IdeasBoard() {
           </button>
         </div>
       )}
-      {/* Header */}
+
+      {/* Header + View Switcher */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-100">
             Fikirler & Mini-GDD Panosu
           </h1>
           <p className="mt-1 text-sm text-zinc-400">
-            Mekanik, hikaye, level ve VFX fikirlerinizi toplayın, görsellerle
-            zenginleştirip oylayın ve tek tıkla göreve dönüştürün.
+            Mekanik, hikaye, level ve VFX fikirlerinizi toplayın, oylayın ve
+            göreve dönüştürün; dönüştürülen fikirler aşağıda ayrı takip edilir.
           </p>
         </div>
 
-        <button
-          type="button"
-          disabled={!isConfigured}
-          onClick={() => setCreateOpen(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-xs font-semibold text-zinc-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Plus className="h-4 w-4" />
-          Yeni Fikir Ekle
-        </button>
-      </div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div
+            role="group"
+            aria-label="Görünüm Modu"
+            className="inline-flex rounded-lg border border-[#242e40] bg-[#0c1018] p-0.5 text-xs"
+          >
+            <button
+              type="button"
+              onClick={() => setIdeasViewMode("cards")}
+              title="Kart Görünümü"
+              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
+                ideasViewMode === "cards"
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Kart</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIdeasViewMode("compact")}
+              title="Kompakt Kartlar"
+              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
+                ideasViewMode === "compact"
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              <Grid2x2 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Kompakt</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIdeasViewMode("list")}
+              title="Tek Satır Liste"
+              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
+                ideasViewMode === "list"
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              <List className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Liste</span>
+            </button>
+          </div>
 
-      {/* Compact Filters Toolbar */}
-      <div className="flex flex-wrap items-center gap-2.5 rounded-xl border border-[#1f2735] bg-[#10141d] p-3">
-        <div className="relative min-w-44 flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Fikirlerde ara (ör. kanca, boss, niagara)..."
-            className="w-full rounded-lg border border-[#242e40] bg-[#080a0f] py-1.5 pr-3 pl-8.5 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-amber-500/60 focus:outline-none"
-          />
-        </div>
-
-        {/* Status Segmented Pills */}
-        <div className="flex flex-wrap items-center gap-1 rounded-lg border border-[#242e40] bg-[#080a0f] p-0.5">
           <button
             type="button"
-            onClick={() => setStatusFilter("all")}
-            className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-              statusFilter === "all"
-                ? "bg-amber-500/20 text-amber-300"
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
+            disabled={!isConfigured}
+            onClick={() => setCreateOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-xs font-semibold text-zinc-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Tümü ({ideas.length})
+            <Plus className="h-4 w-4" />
+            Yeni Fikir Ekle
           </button>
-          {IDEA_STATUSES.map((st) => {
-            const count = ideas.filter(
-              (i) => i.status === st.value
-            ).length;
-            return (
-              <button
-                key={st.value}
-                type="button"
-                onClick={() => setStatusFilter(st.value)}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                  statusFilter === st.value
-                    ? "bg-amber-500/20 text-amber-300"
-                    : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                {st.label} ({count})
-              </button>
-            );
-          })}
         </div>
-
-        <select
-          value={categoryFilter}
-          onChange={(e) =>
-            setCategoryFilter(e.target.value as IdeaCategory | "all")
-          }
-          className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
-        >
-          <option value="all">Kategori: Tümü</option>
-          {IDEA_CATEGORIES.map((cat) => (
-            <option key={cat.value} value={cat.value}>
-              {cat.label}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as "recent" | "votes")}
-          className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
-        >
-          <option value="recent">Son Güncellenen</option>
-          <option value="votes">En Çok Oy Alan</option>
-        </select>
       </div>
 
-      {/* Idea Cards Grid */}
-      {filteredIdeas.length === 0 ? (
+      {/* Section Switcher + Filters Toolbar */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-[#1f2735] bg-[#10141d] p-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setSectionTab("split")}
+              className={`rounded-lg px-3 py-1.5 font-medium transition ${
+                sectionTab === "split"
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Ayrı Bölümler ({ideas.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSectionTab("active")}
+              className={`rounded-lg px-3 py-1.5 font-medium transition ${
+                sectionTab === "active"
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Fikir Havuzu ({totalActiveCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSectionTab("converted")}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-medium transition ${
+                sectionTab === "converted"
+                  ? "bg-cyan-500/20 text-cyan-300"
+                  : "text-zinc-400 hover:text-cyan-200"
+              }`}
+            >
+              <KanbanSquare className="h-3.5 w-3.5" />
+              Göreve Dönüştürülenler ({totalConvertedCount})
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5 rounded-xl border border-[#1f2735] bg-[#10141d] p-3">
+          <div className="relative min-w-44 flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Fikirlerde ara (ör. kanca, boss, niagara)..."
+              className="w-full rounded-lg border border-[#242e40] bg-[#080a0f] py-1.5 pr-3 pl-8.5 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-amber-500/60 focus:outline-none"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1 rounded-lg border border-[#242e40] bg-[#080a0f] p-0.5">
+            <button
+              type="button"
+              onClick={() => setStatusFilter("all")}
+              className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                statusFilter === "all"
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Tümü ({ideas.length})
+            </button>
+            {IDEA_STATUSES.map((st) => {
+              const count = ideas.filter((i) => i.status === st.value).length;
+              return (
+                <button
+                  key={st.value}
+                  type="button"
+                  onClick={() => setStatusFilter(st.value)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                    statusFilter === st.value
+                      ? "bg-amber-500/20 text-amber-300"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  {st.label} ({count})
+                </button>
+              );
+            })}
+          </div>
+
+          <select
+            value={categoryFilter}
+            onChange={(e) =>
+              setCategoryFilter(e.target.value as IdeaCategory | "all")
+            }
+            className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
+          >
+            <option value="all">Kategori: Tümü</option>
+            {IDEA_CATEGORIES.map((cat) => (
+              <option key={cat.value} value={cat.value}>
+                {cat.label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as "recent" | "votes")}
+            className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
+          >
+            <option value="recent">Son Güncellenen</option>
+            <option value="votes">En Çok Oy Alan</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Main Content Sections */}
+      {ideas.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#242e40] bg-[#0c1018] px-6 py-16 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400">
             <Lightbulb className="h-6 w-6" />
           </div>
           <h3 className="mt-4 text-base font-semibold text-zinc-100">
-            {ideas.length === 0
-              ? "Henüz fikir eklenmemiş"
-              : "Filtrelere uyan fikir bulunamadı"}
+            Henüz fikir eklenmemiş
           </h3>
           <p className="mt-1 max-w-md text-xs text-zinc-400">
-            {ideas.length === 0
-              ? "Aklınıza gelen ilk oyun mekaniğini, level fikrini veya görsel referansı ekleyerek ekibin GDD hafızasını başlatın."
-              : "Arama kelimesini veya kategori/durum filtrelerini temizleyip tekrar deneyin."}
+            Aklınıza gelen ilk oyun mekaniğini, level fikrini veya görsel
+            referansı ekleyerek ekibin GDD hafızasını başlatın.
           </p>
-          {ideas.length === 0 && isConfigured && (
+          {isConfigured && (
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
@@ -325,142 +870,79 @@ export function IdeasBoard() {
           )}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredIdeas.map((idea) => {
-            const catMeta =
-              IDEA_CATEGORIES.find((c) => c.value === idea.category) ??
-              IDEA_CATEGORIES[0];
-            const statusMeta =
-              IDEA_STATUSES.find((s) => s.value === idea.status) ??
-              IDEA_STATUSES[0];
+        <div className="space-y-8">
+          {/* Active Ideas Pool */}
+          {sectionTab !== "converted" && (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Lightbulb className="h-4 w-4 text-amber-400" />
+                  <h2 className="text-sm font-semibold text-zinc-100">
+                    Fikir Havuzu & Aktif GDD
+                  </h2>
+                  <span className="rounded-full bg-[#182030] px-2 py-0.5 font-mono text-[11px] text-zinc-300">
+                    {activeIdeas.length}
+                  </span>
+                </div>
+              </div>
 
-            return (
-              <article
-                key={idea.id}
-                className="group flex flex-col overflow-hidden rounded-xl border border-[#1f2735] bg-[#10141d] transition hover:border-amber-500/40"
-              >
-                {idea.preview_image_url && (
-                  <Link
-                    href={`/ideas/${idea.id}`}
-                    className="relative block h-40 w-full overflow-hidden border-b border-[#1f2735] bg-[#080a0f]"
-                  >
-                    <Image
-                      src={idea.preview_image_url}
-                      alt={idea.title}
-                      fill
-                      unoptimized
-                      className="object-cover transition duration-300 group-hover:scale-105"
-                    />
-                  </Link>
-                )}
+              {activeIdeas.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-[#242e40] bg-[#0c1018] px-6 py-10 text-center text-xs text-zinc-400">
+                  {totalActiveCount === 0
+                    ? "Tüm fikirler göreve dönüştürülmüş! Aşağıdaki veya Göreve Dönüştürülenler sekmesindeki listeden takip edebilirsiniz."
+                    : "Filtrelere uyan aktif fikir bulunamadı."}
+                </div>
+              ) : (
+                renderIdeasCollection(activeIdeas)
+              )}
+            </section>
+          )}
 
-                <div className="flex flex-1 flex-col p-5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span
-                      className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${catMeta.badgeClass}`}
-                    >
-                      {catMeta.label}
-                    </span>
-                    <span
-                      className={`rounded-full border px-2.5 py-0.5 text-[10px] font-medium ${statusMeta.badgeClass}`}
-                    >
-                      {statusMeta.label}
-                    </span>
+          {/* Converted Ideas Section (Separate Area) */}
+          {sectionTab !== "active" && (
+            <section className="space-y-4 rounded-2xl border border-cyan-500/25 bg-[#0b101b] p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/15 text-cyan-400">
+                    <CheckCircle2 className="h-4 w-4" />
                   </div>
-
-                  {idea.id.startsWith("temp-") ? (
-                    <span className="mt-3 block text-base font-semibold text-zinc-200">
-                      {idea.title}{" "}
-                      <span className="text-[11px] font-normal text-amber-300/80">
-                        (Kaydediliyor...)
-                      </span>
-                    </span>
-                  ) : (
-                    <Link
-                      href={`/ideas/${idea.id}`}
-                      className="mt-3 block text-base font-semibold text-zinc-100 transition group-hover:text-amber-300"
-                    >
-                      {idea.title}
-                    </Link>
-                  )}
-
-                  <p className="mt-1.5 line-clamp-2 flex-1 text-xs leading-relaxed text-zinc-400">
-                    {idea.summary || "Kısa özet girilmemiş."}
-                  </p>
-
-                  {/* Meta Footer */}
-                  <div className="mt-4 flex items-center justify-between border-t border-[#1b2230] pt-3">
+                  <div>
                     <div className="flex items-center gap-2">
-                      {idea.author ? (
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-zinc-950"
-                            style={{ backgroundColor: idea.author.avatar_color }}
-                          >
-                            {idea.author.display_name.slice(0, 2).toUpperCase()}
-                          </span>
-                          <span className="text-[11px] text-zinc-400">
-                            {idea.author.display_name}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-[11px] text-zinc-500">Ekip</span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3 text-xs text-zinc-400">
-                      {idea.reference_links.length > 0 && (
-                        <span
-                          title="Referans Linki"
-                          className="inline-flex items-center gap-1"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5 text-zinc-500" />
-                          {idea.reference_links.length}
-                        </span>
-                      )}
-                      {idea.attachment_count > 0 && (
-                        <span
-                          title="Görsel / Ek"
-                          className="inline-flex items-center gap-1"
-                        >
-                          <Paperclip className="h-3.5 w-3.5 text-zinc-500" />
-                          {idea.attachment_count}
-                        </span>
-                      )}
-                      <span
-                        title="Yorum"
-                        className="inline-flex items-center gap-1"
-                      >
-                        <MessageSquare className="h-3.5 w-3.5 text-zinc-500" />
-                        {idea.comment_count}
+                      <h2 className="text-sm font-semibold text-zinc-100">
+                        Göreve Dönüştürülen Fikirler
+                      </h2>
+                      <span className="rounded-full border border-cyan-500/30 bg-cyan-500/15 px-2 py-0.5 font-mono text-[11px] text-cyan-300">
+                        {convertedIdeas.length}
                       </span>
-                      {idea.linked_task_count > 0 && (
-                        <span
-                          title="Bağlı Görev"
-                          className="inline-flex items-center gap-1 text-cyan-300"
-                        >
-                          <KanbanSquare className="h-3.5 w-3.5" />
-                          {idea.linked_task_count}
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleOptimisticVote(idea.id)}
-                        className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold transition ${
-                          idea.has_voted
-                            ? "border-amber-500/50 bg-amber-500/20 text-amber-300"
-                            : "border-[#242e40] bg-[#0b0f17] text-zinc-400 hover:border-amber-500/30 hover:text-zinc-200"
-                        }`}
-                      >
-                        <ThumbsUp className="h-3 w-3" />
-                        {idea.vote_count}
-                      </button>
                     </div>
+                    <p className="text-[11px] text-zinc-400">
+                      Kanban panosuna görev olarak aktarılmış GDD ve mekanik
+                      fikirleri
+                    </p>
                   </div>
                 </div>
-              </article>
-            );
-          })}
+
+                <button
+                  type="button"
+                  onClick={() => navigateTab("/tasks")}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 transition hover:bg-cyan-500/20"
+                >
+                  Kanban&apos;da Gör
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              {convertedIdeas.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-[#243045] bg-[#080c14] px-6 py-8 text-center text-xs text-zinc-500">
+                  {totalConvertedCount === 0
+                    ? 'Henüz göreve dönüştürülmüş fikir yok. Bir fikrin detayına girip "Göreve Dönüştür" butonunu kullanabilirsiniz.'
+                    : "Filtrelere uyan dönüştürülmüş fikir bulunamadı."}
+                </div>
+              ) : (
+                renderIdeasCollection(convertedIdeas)
+              )}
+            </section>
+          )}
         </div>
       )}
 

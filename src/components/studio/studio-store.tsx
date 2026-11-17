@@ -33,11 +33,18 @@ export type StudioTabPath =
   | "/settings";
 
 export type TaskBoardViewMode = "kanban" | "compact" | "list";
+export type IdeaBoardViewMode = "cards" | "compact" | "list";
 
 function isTaskBoardViewMode(
   value: string | null
 ): value is TaskBoardViewMode {
   return value === "kanban" || value === "compact" || value === "list";
+}
+
+function isIdeaBoardViewMode(
+  value: string | null
+): value is IdeaBoardViewMode {
+  return value === "cards" || value === "compact" || value === "list";
 }
 
 const STUDIO_TAB_SET = new Set<string>([
@@ -83,6 +90,8 @@ interface StudioStoreValue {
   setTasksMilestoneFilter: Dispatch<SetStateAction<string>>;
   tasksViewMode: TaskBoardViewMode;
   setTasksViewMode: Dispatch<SetStateAction<TaskBoardViewMode>>;
+  ideasViewMode: IdeaBoardViewMode;
+  setIdeasViewMode: Dispatch<SetStateAction<IdeaBoardViewMode>>;
   navigateTab: (href: string, options?: { milestoneId?: string }) => void;
 }
 
@@ -157,6 +166,21 @@ const DEFAULT_DRIVE_FOLDER_ID = "1_eG_uHfIqArDnBMCAR_0ExyM8pcefctH";
     useState<string>("all");
   const [tasksViewMode, setTasksViewModeState] =
     useState<TaskBoardViewMode>("kanban");
+  const [ideasViewMode, setIdeasViewModeState] =
+    useState<IdeaBoardViewMode>("cards");
+
+  const setIdeasViewMode: Dispatch<SetStateAction<IdeaBoardViewMode>> =
+    useCallback((next) => {
+      setIdeasViewModeState((prev) => {
+        const resolved = typeof next === "function" ? next(prev) : next;
+        try {
+          window.localStorage.setItem("studio-ideas-view", resolved);
+        } catch {
+          // localStorage erisim hatasinda sessiz kal
+        }
+        return resolved;
+      });
+    }, []);
   const [driveFolderId, setDriveFolderIdState] = useState<string>(
     DEFAULT_DRIVE_FOLDER_ID
   );
@@ -214,6 +238,10 @@ const DEFAULT_DRIVE_FOLDER_ID = "1_eG_uHfIqArDnBMCAR_0ExyM8pcefctH";
         const savedView = window.localStorage.getItem("studio-tasks-view");
         if (isTaskBoardViewMode(savedView)) {
           setTasksViewModeState(savedView);
+        }
+        const savedIdeasView = window.localStorage.getItem("studio-ideas-view");
+        if (isIdeaBoardViewMode(savedIdeasView)) {
+          setIdeasViewModeState(savedIdeasView);
         }
         const savedSeen = window.localStorage.getItem(
           "studio-last-seen-drive-at"
@@ -347,6 +375,8 @@ const DEFAULT_DRIVE_FOLDER_ID = "1_eG_uHfIqArDnBMCAR_0ExyM8pcefctH";
       setTasksMilestoneFilter,
       tasksViewMode,
       setTasksViewMode,
+      ideasViewMode,
+      setIdeasViewMode,
       navigateTab,
     }),
     [
@@ -372,6 +402,8 @@ const DEFAULT_DRIVE_FOLDER_ID = "1_eG_uHfIqArDnBMCAR_0ExyM8pcefctH";
       tasksMilestoneFilter,
       tasksViewMode,
       setTasksViewMode,
+      ideasViewMode,
+      setIdeasViewMode,
       navigateTab,
     ]
   );
