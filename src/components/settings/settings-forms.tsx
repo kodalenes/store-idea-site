@@ -11,6 +11,7 @@ import {
   HardDrive,
   Copy,
   Check,
+  Info,
 } from "lucide-react";
 import {
   resetWorkspaceDataAction,
@@ -92,6 +93,7 @@ export function SettingsForms() {
     "ue5-studio-drive-secret"
   );
   const [copiedScript, setCopiedScript] = useState(false);
+  const [copiedVersion, setCopiedVersion] = useState(false);
   const [driveTestStatus, setDriveTestStatus] = useState<{
     ok: boolean;
     message: string;
@@ -855,6 +857,88 @@ function collectChangedFiles_(folder, folderPath, sinceMs, out) {
             <span>{resetStatus.message}</span>
           </div>
         )}
+      </section>
+
+      {/* Site Version & Build Info Card */}
+      <section className="rounded-xl border border-[#1f2735] bg-[#10141d] p-6 lg:col-span-2">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-500/15 text-cyan-400">
+              <Info className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-zinc-100">
+                Site Sürümü & Sistem Bilgisi
+              </h2>
+              <p className="text-xs text-zinc-400">
+                Şu anda açık olan derleme, commit ve altyapı sürüm bilgileri
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              const summary = `UE5 Studio Hub v${process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0"} (#${process.env.NEXT_PUBLIC_GIT_COMMIT ?? "local"}) • ${process.env.NEXT_PUBLIC_GIT_BRANCH ?? "main"} • Next.js ${process.env.NEXT_PUBLIC_NEXT_VERSION ?? "16.4.6"}`;
+              void navigator.clipboard.writeText(summary).then(() => {
+                setCopiedVersion(true);
+                setTimeout(() => setCopiedVersion(false), 2000);
+              });
+            }}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#242e40] bg-[#0a0e15] px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:border-cyan-500/40 hover:text-cyan-300"
+          >
+            {copiedVersion ? (
+              <>
+                <Check className="h-3.5 w-3.5 text-emerald-400" />
+                Kopyalandı
+              </>
+            ) : (
+              <>
+                <Copy className="h-3.5 w-3.5" />
+                Sürümü Kopyala
+              </>
+            )}
+          </button>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg border border-[#1d2534] bg-[#0b0f17] px-3.5 py-2.5">
+            <p className="text-xs text-zinc-500">Uygulama Sürümü</p>
+            <p className="mt-1 font-mono text-sm font-semibold text-amber-300">
+              v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0"}{" "}
+              <span className="text-xs font-normal text-zinc-400">
+                (#{process.env.NEXT_PUBLIC_GIT_COMMIT ?? "local"})
+              </span>
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-[#1d2534] bg-[#0b0f17] px-3.5 py-2.5">
+            <p className="text-xs text-zinc-500">Ortam & Dal</p>
+            <p className="mt-1 font-mono text-sm font-medium text-zinc-100">
+              {process.env.NEXT_PUBLIC_GIT_BRANCH ?? "main"}{" "}
+              <span className="text-xs text-cyan-300">
+                · {process.env.NEXT_PUBLIC_DEPLOY_ENV ?? "local"}
+              </span>
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-[#1d2534] bg-[#0b0f17] px-3.5 py-2.5">
+            <p className="text-xs text-zinc-500">Altyapı</p>
+            <p className="mt-1 font-mono text-sm font-medium text-zinc-100">
+              Next.js {process.env.NEXT_PUBLIC_NEXT_VERSION ?? "16.4.6"}{" "}
+              <span className="text-xs text-zinc-400">
+                · React {process.env.NEXT_PUBLIC_REACT_VERSION ?? "19.3.0"}
+              </span>
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-[#1d2534] bg-[#0b0f17] px-3.5 py-2.5">
+            <p className="text-xs text-zinc-500">Son Derleme Zamanı</p>
+            <p className="mt-1 font-mono text-sm font-medium text-zinc-200">
+              {process.env.NEXT_PUBLIC_BUILD_TIME ?? "—"}
+            </p>
+          </div>
+        </div>
       </section>
     </div>
   );
