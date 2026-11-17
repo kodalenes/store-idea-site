@@ -130,7 +130,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Left Studio Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-[#1f2735] bg-[#0c1018] transition-transform duration-200 lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex h-dvh w-64 flex-col border-r border-[#1f2735] bg-[#0c1018] transition-transform duration-200 lg:translate-x-0 ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -298,7 +298,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Main Content Column */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden lg:pl-64">
         {/* Top Mobile Bar */}
         <header className="sticky top-0 z-20 flex items-center justify-between border-b border-[#1f2735] bg-[#0c1018]/95 px-4 py-3 backdrop-blur-sm lg:hidden">
           <button
