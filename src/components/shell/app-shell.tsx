@@ -462,8 +462,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           </>
         )}
 
-        <main className="flex-1 p-4 sm:p-6">
-          <div className="mx-auto max-w-7xl space-y-5">
+        <main className="flex-1 px-3 py-4 sm:px-5 sm:py-5">
+          <div className="w-full space-y-5">
             {isOnTabRoute ? (
               <>
                 {!isConfigured && activeTab !== "/" && <SetupBanner />}

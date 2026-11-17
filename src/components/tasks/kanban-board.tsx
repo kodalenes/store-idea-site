@@ -917,7 +917,7 @@ export function KanbanBoard() {
                   }}
                   className={`${
                     isMobileActive ? "flex" : "hidden md:flex"
-                  } max-h-[420px] min-h-[260px] w-full flex-col overflow-hidden rounded-xl border bg-[#0c1018] transition md:h-full md:max-h-none md:w-76 md:shrink-0 ${
+                  } max-h-[420px] min-h-[260px] w-full flex-col overflow-hidden rounded-xl border bg-[#0c1018] transition md:h-full md:max-h-none md:min-w-[270px] md:flex-1 ${
                     isDropTarget
                       ? "border-amber-400/70 bg-amber-500/5"
                       : `border-[#1f2735] border-t-2 ${column.accentClass}`
@@ -1097,7 +1097,7 @@ export function KanbanBoard() {
                             onClick={() => {
                               if (!isPending) setSelectedTaskId(task.id);
                             }}
-                            className={`rounded-xl border border-[#1f2735] bg-[#121722] p-3.5 transition ${
+                            className={`rounded-xl border border-[#1f2735] bg-[#121722] p-4 transition ${
                               isPending
                                 ? "opacity-75"
                                 : "cursor-pointer hover:border-amber-500/50 hover:bg-[#161c29]"

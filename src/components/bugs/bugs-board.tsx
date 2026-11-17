@@ -708,7 +708,7 @@ export function BugsBoard() {
                     void handleQuickStatusChange(id, column.value);
                   }
                 }}
-                className={`flex max-h-[420px] min-h-[260px] w-full flex-col overflow-hidden rounded-xl border bg-[#0c1018] transition md:h-full md:max-h-none md:w-72 md:shrink-0 ${
+                className={`flex max-h-[420px] min-h-[260px] w-full flex-col overflow-hidden rounded-xl border bg-[#0c1018] transition md:h-full md:max-h-none md:min-w-[265px] md:flex-1 ${
                   isDropTarget
                     ? "border-rose-400/70 bg-rose-500/5"
                     : `border-[#1f2735] border-t-2 ${column.accentClass}`
