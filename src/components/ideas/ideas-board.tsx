@@ -1024,133 +1024,81 @@ export function IdeasBoard() {
         </div>
       )}
 
-      {/* Header + View Switcher */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-100">
-            Fikirler & Mini-GDD Panosu
-          </h1>
-          <p className="mt-1 text-sm text-zinc-400">
-            Fikirleri oyuna eklenecek aşamaya göre sütunlar arasında
-            sürükleyip bırakın; göreve dönüştürülenler aşağıda ayrı takip edilir.
-          </p>
-        </div>
+      {/* Top Action & Search Bar */}
+      <div className="space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#1f2735] bg-[#10141d] p-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              disabled={!isConfigured}
+              onClick={() => setCreateStage("random")}
+              className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-3.5 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" />
+              Yeni Fikir Ekle
+            </button>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div
-            role="group"
-            aria-label="Görünüm Modu"
-            className="inline-flex rounded-lg border border-[#242e40] bg-[#0c1018] p-0.5 text-xs"
-          >
-            <button
-              type="button"
-              onClick={() => setIdeasViewMode("kanban")}
-              title="Aşama Kanbanı"
-              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
-                ideasViewMode === "kanban"
-                  ? "bg-amber-500/20 text-amber-300"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
+            <div
+              role="group"
+              aria-label="Görünüm Modu"
+              className="inline-flex rounded-lg border border-[#242e40] bg-[#080a0f] p-0.5 text-xs"
             >
-              <KanbanSquare className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Kanban</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIdeasViewMode("cards")}
-              title="Kart Görünümü"
-              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
-                ideasViewMode === "cards"
-                  ? "bg-amber-500/20 text-amber-300"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Kart</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIdeasViewMode("compact")}
-              title="Kompakt Kartlar"
-              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
-                ideasViewMode === "compact"
-                  ? "bg-amber-500/20 text-amber-300"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              <Grid2x2 className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Kompakt</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIdeasViewMode("list")}
-              title="Tek Satır Liste"
-              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
-                ideasViewMode === "list"
-                  ? "bg-amber-500/20 text-amber-300"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              <List className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Liste</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setIdeasViewMode("kanban")}
+                title="Aşama Kanbanı"
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
+                  ideasViewMode === "kanban"
+                    ? "bg-amber-500/20 text-amber-300"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <KanbanSquare className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Kanban</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIdeasViewMode("cards")}
+                title="Kart Görünümü"
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
+                  ideasViewMode === "cards"
+                    ? "bg-amber-500/20 text-amber-300"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Kart</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIdeasViewMode("compact")}
+                title="Kompakt Kartlar"
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
+                  ideasViewMode === "compact"
+                    ? "bg-amber-500/20 text-amber-300"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <Grid2x2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Kompakt</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIdeasViewMode("list")}
+                title="Tek Satır Liste"
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
+                  ideasViewMode === "list"
+                    ? "bg-amber-500/20 text-amber-300"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <List className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Liste</span>
+              </button>
+            </div>
           </div>
 
-          <button
-            type="button"
-            disabled={!isConfigured}
-            onClick={() => setCreateStage("random")}
-            className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-xs font-semibold text-zinc-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Plus className="h-4 w-4" />
-            Yeni Fikir Ekle
-          </button>
-        </div>
-      </div>
-
-      {/* Section Switcher + Filters Toolbar */}
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-[#1f2735] bg-[#10141d] p-1 text-xs">
-            <button
-              type="button"
-              onClick={() => setSectionTab("split")}
-              className={`rounded-lg px-3 py-1.5 font-medium transition ${
-                sectionTab === "split"
-                  ? "bg-amber-500/20 text-amber-300"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              Ayrı Bölümler ({ideas.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setSectionTab("active")}
-              className={`rounded-lg px-3 py-1.5 font-medium transition ${
-                sectionTab === "active"
-                  ? "bg-amber-500/20 text-amber-300"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              Fikir Havuzu ({totalActiveCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setSectionTab("converted")}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-medium transition ${
-                sectionTab === "converted"
-                  ? "bg-cyan-500/20 text-cyan-300"
-                  : "text-zinc-400 hover:text-cyan-200"
-              }`}
-            >
-              <KanbanSquare className="h-3.5 w-3.5" />
-              Göreve Dönüştürülenler ({totalConvertedCount})
-            </button>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5 rounded-xl border border-[#1f2735] bg-[#10141d] p-3">
-          <div className="relative min-w-44 flex-1">
+          <div className="relative w-full sm:w-72 md:w-80">
             <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
             <input
               type="text"
@@ -1160,63 +1108,107 @@ export function IdeasBoard() {
               className="w-full rounded-lg border border-[#242e40] bg-[#080a0f] py-1.5 pr-3 pl-8.5 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-amber-500/60 focus:outline-none"
             />
           </div>
+        </div>
 
-          {ideasViewMode !== "kanban" && (
-            <div className="flex flex-wrap items-center gap-1 rounded-lg border border-[#242e40] bg-[#080a0f] p-0.5">
+        {/* Category & Section Filters Underneath Search Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-[#1f2735] bg-[#10141d] p-2.5">
+          <div className="flex flex-wrap items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setCategoryFilter("all")}
+              className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
+                categoryFilter === "all"
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "text-zinc-400 hover:bg-[#171d29] hover:text-zinc-200"
+              }`}
+            >
+              Tümü
+            </button>
+            {IDEA_CATEGORIES.map((cat) => (
+              <button
+                key={cat.value}
+                type="button"
+                onClick={() => setCategoryFilter(cat.value)}
+                className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
+                  categoryFilter === cat.value
+                    ? "bg-amber-500/20 text-amber-300"
+                    : "text-zinc-400 hover:bg-[#171d29] hover:text-zinc-200"
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex flex-wrap items-center gap-1 rounded-lg border border-[#242e40] bg-[#080a0f] p-0.5 text-xs">
               <button
                 type="button"
-                onClick={() => setStatusFilter("all")}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                  statusFilter === "all"
+                onClick={() => setSectionTab("split")}
+                className={`rounded-md px-2.5 py-1 font-medium transition ${
+                  sectionTab === "split"
                     ? "bg-amber-500/20 text-amber-300"
                     : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
-                Tümü ({ideas.length})
+                Ayrı Bölümler ({ideas.length})
               </button>
-              {IDEA_STATUSES.map((st) => {
-                const count = ideas.filter((i) => i.status === st.value).length;
-                return (
-                  <button
-                    key={st.value}
-                    type="button"
-                    onClick={() => setStatusFilter(st.value)}
-                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                      statusFilter === st.value
-                        ? "bg-amber-500/20 text-amber-300"
-                        : "text-zinc-400 hover:text-zinc-200"
-                    }`}
-                  >
-                    {st.label} ({count})
-                  </button>
-                );
-              })}
+              <button
+                type="button"
+                onClick={() => setSectionTab("active")}
+                className={`rounded-md px-2.5 py-1 font-medium transition ${
+                  sectionTab === "active"
+                    ? "bg-amber-500/20 text-amber-300"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                Fikir Havuzu ({totalActiveCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSectionTab("converted")}
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition ${
+                  sectionTab === "converted"
+                    ? "bg-cyan-500/20 text-cyan-300"
+                    : "text-zinc-400 hover:text-cyan-200"
+                }`}
+              >
+                <KanbanSquare className="h-3.5 w-3.5" />
+                Göreve Dönüştürülenler ({totalConvertedCount})
+              </button>
             </div>
-          )}
 
-          <select
-            value={categoryFilter}
-            onChange={(e) =>
-              setCategoryFilter(e.target.value as IdeaCategory | "all")
-            }
-            className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
-          >
-            <option value="all">Kategori: Tümü</option>
-            {IDEA_CATEGORIES.map((cat) => (
-              <option key={cat.value} value={cat.value}>
-                {cat.label}
-              </option>
-            ))}
-          </select>
+            {ideasViewMode !== "kanban" && (
+              <select
+                value={statusFilter}
+                onChange={(e) =>
+                  setStatusFilter(e.target.value as IdeaStatus | "all")
+                }
+                className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
+              >
+                <option value="all">Durum: Tümü ({ideas.length})</option>
+                {IDEA_STATUSES.map((st) => {
+                  const count = ideas.filter(
+                    (i) => i.status === st.value
+                  ).length;
+                  return (
+                    <option key={st.value} value={st.value}>
+                      {st.label} ({count})
+                    </option>
+                  );
+                })}
+              </select>
+            )}
 
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as "recent" | "votes")}
-            className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
-          >
-            <option value="recent">Son Güncellenen</option>
-            <option value="votes">En Çok Oy Alan</option>
-          </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as "recent" | "votes")}
+              className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
+            >
+              <option value="recent">Son Güncellenen</option>
+              <option value="votes">En Çok Oy Alan</option>
+            </select>
+          </div>
         </div>
       </div>
 

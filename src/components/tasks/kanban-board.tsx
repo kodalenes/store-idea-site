@@ -463,87 +463,6 @@ export function KanbanBoard() {
 
   return (
     <div className="space-y-5 pb-8">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-100">
-            UE5 Görevler & Kanban Panosu
-          </h1>
-          <p className="mt-1 text-sm text-zinc-400">
-            Kartları sütunlar arasında sürükleyip bırakın, alt görevleri ve
-            bağımlılıkları yönetin.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5">
-          {openBugsTotal > 0 && (
-            <button
-              type="button"
-              onClick={() => navigateTab("/bugs")}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/35 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-200 transition hover:bg-rose-500/20"
-            >
-              <Bug className="h-3.5 w-3.5 text-rose-400" />
-              Buglar ({openBugsTotal} Açık)
-            </button>
-          )}
-          <div
-            role="group"
-            aria-label="Görünüm Modu"
-            className="inline-flex rounded-lg border border-[#242e40] bg-[#0c1018] p-0.5 text-xs"
-          >
-            <button
-              type="button"
-              onClick={() => setTasksViewMode("kanban")}
-              title="Standart Kanban"
-              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
-                tasksViewMode === "kanban"
-                  ? "bg-amber-500/20 text-amber-300"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              <KanbanSquare className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Kanban</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setTasksViewMode("compact")}
-              title="Kompakt Kanban"
-              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
-                tasksViewMode === "compact"
-                  ? "bg-amber-500/20 text-amber-300"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Kompakt</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setTasksViewMode("list")}
-              title="Tek Satır Liste"
-              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
-                tasksViewMode === "list"
-                  ? "bg-amber-500/20 text-amber-300"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              <List className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Liste</span>
-            </button>
-          </div>
-
-          <button
-            type="button"
-            disabled={!isConfigured}
-            onClick={() => setCreateStatus("todo")}
-            className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-xs font-semibold text-zinc-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Plus className="h-4 w-4" />
-            Yeni Görev Ekle
-          </button>
-        </div>
-      </div>
-
       {boardError && (
         <div className="flex items-center justify-between gap-2 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-2.5 text-xs text-rose-200">
           <span>{boardError}</span>
@@ -557,97 +476,188 @@ export function KanbanBoard() {
         </div>
       )}
 
-      {/* Compact Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#1f2735] bg-[#10141d] p-3">
-        {currentUserId && (
-          <div className="inline-flex rounded-lg border border-[#242e40] bg-[#080a0f] p-0.5 text-xs">
+      {/* Top Action & Search Bar + Filters */}
+      <div className="space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#1f2735] bg-[#10141d] p-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               type="button"
-              onClick={() => setAssigneeFilter("all")}
-              className={`rounded-md px-2.5 py-1.5 font-medium transition ${
-                assigneeFilter !== "mine"
-                  ? "bg-[#1a2232] text-zinc-100"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
+              disabled={!isConfigured}
+              onClick={() => setCreateStatus("todo")}
+              className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-3.5 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Tüm İşler
+              <Plus className="h-4 w-4" />
+              Yeni Görev Ekle
             </button>
-            <button
-              type="button"
-              onClick={() => setAssigneeFilter("mine")}
-              className={`rounded-md px-2.5 py-1.5 font-medium transition ${
-                assigneeFilter === "mine"
-                  ? "bg-amber-500/20 text-amber-300"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              Bana Atananlar
-            </button>
-          </div>
-        )}
 
-        <div className="relative min-w-44 flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Görev veya tag ara..."
-            className="w-full rounded-lg border border-[#242e40] bg-[#080a0f] py-1.5 pr-3 pl-8.5 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-amber-500/60 focus:outline-none"
-          />
+            <div
+              role="group"
+              aria-label="Görünüm Modu"
+              className="inline-flex rounded-lg border border-[#242e40] bg-[#080a0f] p-0.5 text-xs"
+            >
+              <button
+                type="button"
+                onClick={() => setTasksViewMode("kanban")}
+                title="Standart Kanban"
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
+                  tasksViewMode === "kanban"
+                    ? "bg-amber-500/20 text-amber-300"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <KanbanSquare className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Kanban</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTasksViewMode("compact")}
+                title="Kompakt Kanban"
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
+                  tasksViewMode === "compact"
+                    ? "bg-amber-500/20 text-amber-300"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Kompakt</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTasksViewMode("list")}
+                title="Tek Satır Liste"
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition ${
+                  tasksViewMode === "list"
+                    ? "bg-amber-500/20 text-amber-300"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <List className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Liste</span>
+              </button>
+            </div>
+
+            {openBugsTotal > 0 && (
+              <button
+                type="button"
+                onClick={() => navigateTab("/bugs")}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/35 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-200 transition hover:bg-rose-500/20"
+              >
+                <Bug className="h-3.5 w-3.5 text-rose-400" />
+                Buglar ({openBugsTotal} Açık)
+              </button>
+            )}
+          </div>
+
+          <div className="relative w-full sm:w-72 md:w-80">
+            <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Görev veya tag ara..."
+              className="w-full rounded-lg border border-[#242e40] bg-[#080a0f] py-1.5 pr-3 pl-8.5 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-amber-500/60 focus:outline-none"
+            />
+          </div>
         </div>
 
-        <select
-          value={assigneeFilter}
-          onChange={(e) => setAssigneeFilter(e.target.value)}
-          className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
-        >
-          <option value="all">Kişi: Tümü</option>
-          {currentUserId && <option value="mine">Bana Atananlar</option>}
-          <option value="unassigned">Atanmamış</option>
-          {teamProfiles.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.display_name}
-            </option>
-          ))}
-        </select>
+        {/* Category / Discipline & Filters Underneath Search Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-[#1f2735] bg-[#10141d] p-2.5">
+          <div className="flex flex-wrap items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setTagFilter("all")}
+              className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
+                tagFilter === "all"
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "text-zinc-400 hover:bg-[#171d29] hover:text-zinc-200"
+              }`}
+            >
+              Tümü
+            </button>
+            {UE_DISCIPLINE_TAGS.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setTagFilter(tag)}
+                className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
+                  tagFilter === tag
+                    ? "bg-amber-500/20 text-amber-300"
+                    : "text-zinc-400 hover:bg-[#171d29] hover:text-zinc-200"
+                }`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
 
-        <select
-          value={tagFilter}
-          onChange={(e) => setTagFilter(e.target.value)}
-          className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
-        >
-          <option value="all">Etiket: Tümü</option>
-          {UE_DISCIPLINE_TAGS.map((tag) => (
-            <option key={tag} value={tag}>
-              {tag}
-            </option>
-          ))}
-        </select>
+          <div className="flex flex-wrap items-center gap-2">
+            {currentUserId && (
+              <div className="inline-flex rounded-lg border border-[#242e40] bg-[#080a0f] p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setAssigneeFilter("all")}
+                  className={`rounded-md px-2.5 py-1 font-medium transition ${
+                    assigneeFilter !== "mine"
+                      ? "bg-[#1a2232] text-zinc-100"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  Tüm İşler
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAssigneeFilter("mine")}
+                  className={`rounded-md px-2.5 py-1 font-medium transition ${
+                    assigneeFilter === "mine"
+                      ? "bg-amber-500/20 text-amber-300"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  Bana Atananlar
+                </button>
+              </div>
+            )}
 
-        <select
-          value={milestoneFilter}
-          onChange={(e) => setMilestoneFilter(e.target.value)}
-          className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
-        >
-          <option value="all">Sistem / Hedef: Tümü</option>
-          {milestones.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.title}
-            </option>
-          ))}
-        </select>
+            <select
+              value={assigneeFilter}
+              onChange={(e) => setAssigneeFilter(e.target.value)}
+              className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
+            >
+              <option value="all">Kişi: Tümü</option>
+              {currentUserId && <option value="mine">Bana Atananlar</option>}
+              <option value="unassigned">Atanmamış</option>
+              {teamProfiles.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.display_name}
+                </option>
+              ))}
+            </select>
 
-        {hasActiveFilters && (
-          <button
-            type="button"
-            onClick={resetFilters}
-            className="inline-flex items-center gap-1 rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-300 hover:border-amber-500/40 hover:text-amber-300"
-          >
-            <RotateCcw className="h-3 w-3" />
-            Sıfırla
-          </button>
-        )}
+            <select
+              value={milestoneFilter}
+              onChange={(e) => setMilestoneFilter(e.target.value)}
+              className="rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500/60 focus:outline-none"
+            >
+              <option value="all">Sistem / Hedef: Tümü</option>
+              {milestones.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.title}
+                </option>
+              ))}
+            </select>
+
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="inline-flex items-center gap-1 rounded-lg border border-[#242e40] bg-[#080a0f] px-2.5 py-1.5 text-xs text-zinc-300 hover:border-amber-500/40 hover:text-amber-300"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Sıfırla
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {tasksViewMode === "list" ? (
