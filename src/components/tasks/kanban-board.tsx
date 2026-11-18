@@ -23,6 +23,7 @@ import {
   List,
   Users,
   BarChart3,
+  Upload,
 } from "lucide-react";
 import {
   TASK_PRIORITIES,
@@ -31,10 +32,12 @@ import {
 } from "@/lib/constants";
 import { useStudioStore } from "@/components/studio/studio-store";
 import {
+  bulkImportTasksAction,
   createTaskAction,
   deleteTaskAction,
   moveTaskStatusAction,
   updateTaskAction,
+  type BulkImportTaskInput,
 } from "@/app/actions/tasks";
 import type { TaskFormValues } from "@/components/tasks/task-form-modal";
 
@@ -42,6 +45,14 @@ const TaskFormModal = dynamic(
   () =>
     import("@/components/tasks/task-form-modal").then(
       (mod) => mod.TaskFormModal
+    ),
+  { ssr: false }
+);
+
+const BulkTaskImportModal = dynamic(
+  () =>
+    import("@/components/tasks/bulk-import-modal").then(
+      (mod) => mod.BulkTaskImportModal
     ),
   { ssr: false }
 );
@@ -158,6 +169,7 @@ export function KanbanBoard() {
 
   // Modals & Drawer
   const [createStatus, setCreateStatus] = useState<TaskStatus | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskBoardItem | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [boardError, setBoardError] = useState<string | null>(null);
@@ -370,6 +382,64 @@ export function KanbanBoard() {
     }
   }
 
+  async function handleBulkImportSubmit(items: BulkImportTaskInput[]) {
+    setBoardError(null);
+    try {
+      const res = await bulkImportTasksAction(items);
+      if (!res.ok || !res.data) {
+        return {
+          ok: false,
+          error: res.error ?? "Toplu görev içe aktarılamadı.",
+        };
+      }
+
+      const createdMeta = res.data.tasks;
+      const createdBoardItems: TaskBoardItem[] = items.map((item, idx) => {
+        const meta = createdMeta[idx];
+        const assignee = item.assignee_id
+          ? teamProfiles.find((p) => p.id === item.assignee_id) ?? null
+          : null;
+        const ms = item.milestone_id
+          ? milestones.find((m) => m.id === item.milestone_id) ?? null
+          : null;
+
+        return {
+          id: meta?.id ?? `imported-${Date.now()}-${idx}`,
+          title: item.title,
+          description_md: item.description_md,
+          kind: "task",
+          status: item.status,
+          priority: item.priority,
+          ue_tags: item.ue_tags,
+          assignee_id: item.assignee_id,
+          reporter_id: currentUserId,
+          milestone_id: item.milestone_id,
+          source_idea_id: null,
+          blocked_by_task_id: null,
+          bug_severity: null,
+          repro_steps: "",
+          build_version: "",
+          position: idx,
+          created_at: meta?.created_at ?? new Date().toISOString(),
+          updated_at: meta?.updated_at ?? new Date().toISOString(),
+          assignee,
+          reporter: currentProfile,
+          milestone: ms ? { id: ms.id, title: ms.title } : null,
+          source_idea: null,
+          blocked_by_task: null,
+          subtasks: meta?.subtasks ?? [],
+          comment_count: 0,
+          attachment_count: 0,
+        };
+      });
+
+      setTasks((prev) => [...createdBoardItems, ...prev]);
+      return { ok: true, created: createdMeta };
+    } catch {
+      return { ok: false, error: "Bağlantı hatası: İçe aktarma tamamlanamadı." };
+    }
+  }
+
   async function handleEditSubmit(values: TaskFormValues) {
     if (!editingTask) return { ok: false, error: "Görev bulunamadı." };
     const targetId = editingTask.id;
@@ -488,6 +558,17 @@ export function KanbanBoard() {
             >
               <Plus className="h-4 w-4" />
               Yeni Görev Ekle
+            </button>
+
+            <button
+              type="button"
+              disabled={!isConfigured}
+              onClick={() => setImportOpen(true)}
+              title="JSON veya Markdown dosyası / metni ile toplu görev oluştur"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#243044] bg-[#131926] px-3 py-2 text-xs font-medium text-zinc-200 transition hover:border-cyan-500/40 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Upload className="h-3.5 w-3.5 text-cyan-400" />
+              Toplu İçe Aktar
             </button>
 
             <div
@@ -1435,6 +1516,17 @@ export function KanbanBoard() {
           allTasks={tasks}
           onClose={() => setCreateStatus(null)}
           onSubmit={handleCreateSubmit}
+        />
+      )}
+
+      {/* Bulk Task Import Modal */}
+      {importOpen && (
+        <BulkTaskImportModal
+          open
+          teamProfiles={teamProfiles}
+          milestones={milestones}
+          onClose={() => setImportOpen(false)}
+          onImportSubmit={handleBulkImportSubmit}
         />
       )}
 
